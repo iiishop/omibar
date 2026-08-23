@@ -1,0 +1,10 @@
+# qml build artifacts
+*.qmlc
+*.jsc
+qmldir.cache
+
+# editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
