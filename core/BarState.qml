@@ -21,11 +21,10 @@ QtObject {
     property bool sidebarOpen: false
 
     // ---- 派生：bar 是否让位 ----
-    // 避让策略待定：滑出（offset = height）或原地缩小。先按滑出实现。
     readonly property bool shouldYield: fullscreen || launcherOpen || dashboardOpen
 
-    // bar 自身高度，由 BarWindow 回写，供 offset 计算用
+    // bar 自身几何，由 BarWindow 回写
     property real barHeight: 0
-    // 0 = 原位；正值 = 向下滑出的距离
-    readonly property real yieldOffset: shouldYield ? barHeight + 8 : 0
+    // 让位时整条滑出屏幕底部（含 margin），归位时回到贴底位置
+    readonly property real yieldOffset: shouldYield ? barHeight + 12 : 0
 }

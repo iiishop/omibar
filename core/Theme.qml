@@ -13,7 +13,7 @@ QtObject {
 
     readonly property string schemePath: Quickshell.env("HOME") + "/.local/state/caelestia/scheme.json"
 
-    // M3 语义槽（暗色基线）
+    // M3 语义槽（暗色基线）；胶囊本体固定近黑，这些色只用于内容
     property color surface: "#1b1b1f"
     property color surfaceContainer: "#1e1e22"
     property color fg: "#e4e2e6"

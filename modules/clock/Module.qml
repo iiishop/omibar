@@ -2,11 +2,14 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import "../../core"
 
 Text {
     required property BarState barState
 
-    text: Qt.formatDateTime(new Date(), "HH:mm:ss")
+    property string format: "HH:mm:ss"
+
+    text: Qt.formatDateTime(new Date(), format)
     color: Theme.fg
     font.family: "monospace"
     font.pixelSize: 14
@@ -15,6 +18,6 @@ Text {
         interval: 1000
         running: true
         repeat: true
-        onTriggered: parent.text = Qt.formatDateTime(new Date(), "HH:mm:ss")
+        onTriggered: parent.text = Qt.formatDateTime(new Date(), parent.format)
     }
 }
