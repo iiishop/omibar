@@ -30,13 +30,15 @@ PanelWindow {
     margins.bottom: 3
 
     readonly property int capsuleHeight: 32
+    property bool completed: false
 
     implicitHeight: capsuleHeight
-    implicitWidth: panel.width
+    implicitWidth: panel.width + 2 * BarState.yieldShift
 
-    exclusiveZone: BarState.shouldYield ? 0 : 26
+    exclusiveZone: BarState.fullscreen ? 0 : 26
 
     Component.onCompleted: {
+        completed = true;
         console.log("[bar] completed. screen:", screenW, "x", screenH,
                     "SIG:", Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || "(unset!)");
     }
@@ -47,9 +49,12 @@ PanelWindow {
 
         readonly property real targetWidth: host.contentWidth > 0
             ? host.contentWidth : 10
+        property real deformX: 1.0
+        property real deformY: 1.0
 
-        x: BarState.yieldOffsetX
-        y: BarState.shouldYield ? root.implicitHeight + 12 : 0
+        x: BarState.yieldShift
+            + (BarState.launcherOpen ? BarState.yieldDirection * BarState.yieldShift : 0)
+        y: BarState.fullscreen ? 5 : 0
 
         width: targetWidth
         height: root.capsuleHeight
@@ -57,13 +62,19 @@ PanelWindow {
         radius: height / 2          // 全圆角胶囊
         color: "#0a0a0c"            // 灵动岛近黑：岛是"屏幕上的洞"，不跟主题
 
-        opacity: BarState.shouldYield ? 0.55 : 1.0
+        opacity: 1.0
 
-        // 水平形变：避让时压缩。transformOrigin 设为右端——压缩向右端收，
-        // 视觉上像被外部浮层从右侧"挤"了一下。
+        function playDeform(): void {
+            deformAnimation.stop();
+            deformX = 1.0;
+            deformY = 1.0;
+            deformAnimation.start();
+        }
+
         transform: Scale {
-            xScale: BarState.yieldScaleX
-            origin.x: panel.width      // 右缘为原点
+            xScale: panel.deformX
+            yScale: panel.deformY
+            origin.x: BarState.yieldDirection < 0 ? panel.width : 0
             origin.y: panel.height / 2
         }
 
@@ -77,10 +88,75 @@ PanelWindow {
         Behavior on y {
             SpringAnimation { spring: 4; damping: 0.7; mass: 1.0 }
         }
-        Behavior on opacity {
-            NumberAnimation {
-                duration: BarState.shouldYield ? 150 : 250
-                easing.type: Easing.OutQuad
+
+        SequentialAnimation {
+            id: deformAnimation
+
+            ParallelAnimation {
+                NumberAnimation {
+                    target: panel
+                    property: "deformX"
+                    to: 0.72
+                    duration: 130
+                    easing.type: Easing.OutQuad
+                }
+                NumberAnimation {
+                    target: panel
+                    property: "deformY"
+                    to: 1.18
+                    duration: 130
+                    easing.type: Easing.OutQuad
+                }
+            }
+            ParallelAnimation {
+                NumberAnimation {
+                    target: panel
+                    property: "deformX"
+                    to: 1.14
+                    duration: 115
+                    easing.type: Easing.OutCubic
+                }
+                NumberAnimation {
+                    target: panel
+                    property: "deformY"
+                    to: 0.92
+                    duration: 115
+                    easing.type: Easing.OutCubic
+                }
+            }
+            ParallelAnimation {
+                SpringAnimation {
+                    target: panel
+                    property: "deformX"
+                    to: 1.0
+                    spring: 4
+                    damping: 0.28
+                    mass: 0.8
+                    epsilon: 0.002
+                }
+                SpringAnimation {
+                    target: panel
+                    property: "deformY"
+                    to: 1.0
+                    spring: 4
+                    damping: 0.28
+                    mass: 0.8
+                    epsilon: 0.002
+                }
+            }
+        }
+
+        Connections {
+            target: BarState
+
+            function onLauncherOpenChanged(): void {
+                if (root.completed)
+                    panel.playDeform();
+            }
+
+            function onDeformPulseChanged(): void {
+                if (root.completed)
+                    panel.playDeform();
             }
         }
 
@@ -90,6 +166,19 @@ PanelWindow {
             value: panel.width
         }
 
+        Binding {
+            target: BarState
+            property: "screenWidth"
+            value: root.screenW
+        }
+
+        Binding {
+            target: BarState
+            property: "capsuleCenterX"
+            value: root.screenW / 2 - root.implicitWidth / 2
+                + BarState.yieldShift + panel.width / 2
+        }
+
         // 模块装载：清单驱动，左中右三区。集体避让由 ModuleHost 内部处理。
         ModuleHost {
             id: host
@@ -97,7 +186,6 @@ PanelWindow {
             configDir: Quickshell.env("HOME") + "/Projects/omibar"
             height: parent.height
             width: contentWidth
-            capsuleTargetWidth: panel.targetWidth
         }
     }
 }

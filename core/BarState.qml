@@ -16,10 +16,12 @@ QtObject {
 
     // ---- 可选集成状态 ----
     property bool caelestiaAvailable: false
-    // caelestia launcher 水平居中（源码硬编码 horizontalCenter），
-    // 因此避让方向恒为左。若未来支持其他位置，此处扩展为方向枚举。
     property bool launcherOpen: false
-    readonly property bool launcherCentered: true
+    property real screenWidth: 0
+    property real capsuleCenterX: screenWidth / 2
+    property int deformPulse: 0
+    readonly property real launcherWidth: 630
+    readonly property real launcherPadding: 14
 
     property bool dashboardOpen: false
     property bool sidebarOpen: false
@@ -27,12 +29,11 @@ QtObject {
     // ---- 避让派生状态 ----
     readonly property bool shouldYield: fullscreen || launcherOpen
 
-    // 胶囊整体避让位移（向左滑出的距离）
-    readonly property real yieldOffsetX: shouldYield ? -yieldShift : 0
-    // 让位滑移量：胶囊宽度的一半再多点，视觉上"让出中心"
     property real capsuleWidth: 0
-    readonly property real yieldShift: Math.min(capsuleWidth * 1.2, 400)
+    readonly property real launcherLeft: (screenWidth - launcherWidth) / 2
+    readonly property real launcherRight: launcherLeft + launcherWidth
+    readonly property real launcherCenterX: screenWidth / 2
+    readonly property real yieldDirection: capsuleCenterX <= launcherCenterX ? -1 : 1
+    readonly property real yieldShift: (launcherWidth + capsuleWidth) / 2 + launcherPadding
 
-    // 形变：避让时胶囊水平压缩（squash），返回时恢复
-    readonly property real yieldScaleX: shouldYield ? 0.82 : 1.0
 }
