@@ -1,6 +1,5 @@
-// Theme — 从 caelestia scheme.json 同步配色。
-// 换壁纸 → caelestia smartScheme 重新生成配色 → 本文件轮询跟进。
-// scheme.json 不可用时回落到内置的暗色基线，bar 永远可用。
+// Theme — 内置暗色基线，可选同步 caelestia scheme.json。
+// scheme.json 不可用是正常状态，bar 继续使用内置配色。
 pragma Singleton
 pragma ComponentBehavior: Bound
 
@@ -49,7 +48,7 @@ QtObject {
             }
         }
         onFileChanged: root.refresh()
-        onLoadFailed: err => console.warn("[omibar] scheme.json unavailable:", err)
+        onLoadFailed: err => {}
     }
 
     Component.onCompleted: refresh()

@@ -14,11 +14,13 @@ QtObject {
             // payload: "0"/"1"
             BarState.fullscreen = event.data[0] === "1";
         } else if (name === "workspacev2") {
-            // payload: workspaceId, workspaceName
             BarState.activeWorkspace = event.data[1] ?? event.data[0];
         } else if (name === "activewindow") {
             // payload: class, title；空 class = 无活动窗口
             BarState.activeWindowTitle = event.data[0] === "" ? "" : (event.data[1] ?? "");
+        } else if (name === "openwindow" || name === "closewindow"
+                   || name === "openlayer" || name === "closelayer") {
+            CaelestiaBridge.refreshLauncher();
         }
     }
 

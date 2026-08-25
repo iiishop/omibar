@@ -26,19 +26,14 @@ PanelWindow {
     anchors.bottom: true
     anchors.left: false
     anchors.right: false
-    // 下沉到 caelestia 凸条顶：gaps_out 底部 10 + caelestia border 厚度 10
+    // 贴近屏幕底部，避开 Hyprland gaps。
     margins.bottom: 3
 
-    // 胶囊几何（panel 内定义，这里引用做窗口尺寸）
     readonly property int capsuleHeight: 32
-    readonly property int bottomMargin: 0
 
-    implicitHeight: capsuleHeight + bottomMargin
+    implicitHeight: capsuleHeight
     implicitWidth: panel.width
 
-    // 排他：把普通窗口抬到胶囊顶之上（窗口底=1440-Z-gaps10=1394），
-    // 排他 26（实测校准）：普通窗口底边=1390，与胶囊顶(1395)保持 5px 间距；
-    // 胶囊底(1427)到 caelestia 凸条(1440)约 13px
     exclusiveZone: BarState.shouldYield ? 0 : 26
 
     Component.onCompleted: {
@@ -46,18 +41,15 @@ PanelWindow {
                     "SIG:", Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || "(unset!)");
     }
 
-    // 胶囊本体：宽度由模块内容驱动，水平居中
+    // 胶囊本体：宽度由模块内容驱动
     Rectangle {
         id: panel
 
         readonly property real targetWidth: host.contentWidth > 0
             ? host.contentWidth : 10
 
-        // 窗口本身就是胶囊大小（只锚 bottom，宽度随内容），panel 填满窗口即可。
-        // 水平居中由 layer-shell 的锚定布局处理：不锚 left/right 时 Hyprland
-        // 把 surface 放在屏幕水平中心（实测 xywh x=1262 ≈ 居中）。
-        x: 0
-        y: root.bottomMargin + (BarState.shouldYield ? root.implicitHeight + 12 : 0)
+        x: BarState.yieldOffsetX
+        y: BarState.shouldYield ? root.implicitHeight + 12 : 0
 
         width: targetWidth
         height: root.capsuleHeight
@@ -65,14 +57,22 @@ PanelWindow {
         radius: height / 2          // 全圆角胶囊
         color: "#0a0a0c"            // 灵动岛近黑：岛是"屏幕上的洞"，不跟主题
 
-        opacity: BarState.shouldYield ? 0.0 : 1.0
+        opacity: BarState.shouldYield ? 0.55 : 1.0
+
+        // 水平形变：避让时压缩。transformOrigin 设为右端——压缩向右端收，
+        // 视觉上像被外部浮层从右侧"挤"了一下。
+        transform: Scale {
+            xScale: BarState.yieldScaleX
+            origin.x: panel.width      // 右缘为原点
+            origin.y: panel.height / 2
+        }
 
         // ---- 弹簧物理 ----
         Behavior on width {
             SpringAnimation { spring: 3; damping: 0.62; mass: 0.8 }
         }
         Behavior on x {
-            SpringAnimation { spring: 3; damping: 0.62; mass: 0.8 }
+            SpringAnimation { spring: 4; damping: 0.6; mass: 1.0 }
         }
         Behavior on y {
             SpringAnimation { spring: 4; damping: 0.7; mass: 1.0 }
@@ -84,13 +84,20 @@ PanelWindow {
             }
         }
 
-        // 模块装载：清单驱动，左中右三区
+        Binding {
+            target: BarState
+            property: "capsuleWidth"
+            value: panel.width
+        }
+
+        // 模块装载：清单驱动，左中右三区。集体避让由 ModuleHost 内部处理。
         ModuleHost {
             id: host
 
             configDir: Quickshell.env("HOME") + "/Projects/omibar"
             height: parent.height
             width: contentWidth
+            capsuleTargetWidth: panel.targetWidth
         }
     }
 }
