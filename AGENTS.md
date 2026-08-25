@@ -9,6 +9,7 @@
 - `core/*.qml` 是单例（见 core/qmldir），禁止在其中创建第二个 PanelWindow。
 - bar 的显隐/避让动画必须做在内部元素的 y/opacity 上；PanelWindow 自身的 visible 不得参与动画（合成器 layersIn/Out 会叠加）。
 - 新模块必须在 `bar.json` 登记后才被装载；清单是唯一事实来源。
+- 修改避让、launcher 状态同步、caelestia IPC、胶囊布局时，必须同步维护 `docs/avoidance-and-caelestia.md`。
 
 ## 环境
 
@@ -20,4 +21,4 @@
 ## 已知坑
 
 - FileView 读 JSON 用 try/catch 包 parse；清单损坏时保持上次成功状态，不清空 bar。
-- launcher 状态由 Hyprland 窗口事件触发查询；禁止为 launcher 状态重新引入 Timer 轮询。
+- launcher 状态优先由 Hyprland 窗口事件触发查询；允许 `BarState.launcherOpen` 为 true 期间的 bounded watcher，禁止 always-on Timer 轮询。

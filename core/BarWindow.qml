@@ -33,7 +33,7 @@ PanelWindow {
     property bool completed: false
 
     implicitHeight: capsuleHeight
-    implicitWidth: panel.width + 2 * BarState.yieldShift
+    implicitWidth: panel.width + 2 * BarState.avoidanceInset
 
     exclusiveZone: BarState.fullscreen ? 0 : 26
 
@@ -43,17 +43,14 @@ PanelWindow {
                     "SIG:", Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || "(unset!)");
     }
 
-    // 外层只负责整组移动和形变；每个非空区域的胶囊由 ModuleHost 绘制。
+    // 外层只保留整组的垂直避让；水平避让由每个胶囊分别处理。
     Item {
         id: panel
 
         readonly property real targetWidth: host.contentWidth > 0
             ? host.contentWidth : 10
-        property real deformX: 1.0
-        property real deformY: 1.0
 
-        x: BarState.yieldShift
-            + (BarState.launcherOpen ? BarState.yieldDirection * BarState.yieldShift : 0)
+        x: BarState.avoidanceInset
         y: BarState.fullscreen ? 5 : 0
 
         width: targetWidth
@@ -61,105 +58,17 @@ PanelWindow {
 
         opacity: 1.0
 
-        function playDeform(): void {
-            deformAnimation.stop();
-            deformX = 1.0;
-            deformY = 1.0;
-            deformAnimation.start();
-        }
-
-        transform: Scale {
-            xScale: panel.deformX
-            yScale: panel.deformY
-            origin.x: BarState.yieldDirection < 0 ? panel.width : 0
-            origin.y: panel.height / 2
-        }
-
         // ---- 弹簧物理 ----
         Behavior on width {
             SpringAnimation { spring: 3; damping: 0.62; mass: 0.8 }
-        }
-        Behavior on x {
-            SpringAnimation { spring: 4; damping: 0.6; mass: 1.0 }
         }
         Behavior on y {
             SpringAnimation { spring: 4; damping: 0.7; mass: 1.0 }
         }
 
-        SequentialAnimation {
-            id: deformAnimation
-
-            ParallelAnimation {
-                NumberAnimation {
-                    target: panel
-                    property: "deformX"
-                    to: 0.72
-                    duration: 130
-                    easing.type: Easing.OutQuad
-                }
-                NumberAnimation {
-                    target: panel
-                    property: "deformY"
-                    to: 1.18
-                    duration: 130
-                    easing.type: Easing.OutQuad
-                }
-            }
-            ParallelAnimation {
-                NumberAnimation {
-                    target: panel
-                    property: "deformX"
-                    to: 1.14
-                    duration: 115
-                    easing.type: Easing.OutCubic
-                }
-                NumberAnimation {
-                    target: panel
-                    property: "deformY"
-                    to: 0.92
-                    duration: 115
-                    easing.type: Easing.OutCubic
-                }
-            }
-            ParallelAnimation {
-                SpringAnimation {
-                    target: panel
-                    property: "deformX"
-                    to: 1.0
-                    spring: 4
-                    damping: 0.28
-                    mass: 0.8
-                    epsilon: 0.002
-                }
-                SpringAnimation {
-                    target: panel
-                    property: "deformY"
-                    to: 1.0
-                    spring: 4
-                    damping: 0.28
-                    mass: 0.8
-                    epsilon: 0.002
-                }
-            }
-        }
-
-        Connections {
-            target: BarState
-
-            function onLauncherOpenChanged(): void {
-                if (root.completed)
-                    panel.playDeform();
-            }
-
-            function onDeformPulseChanged(): void {
-                if (root.completed)
-                    panel.playDeform();
-            }
-        }
-
         Binding {
             target: BarState
-            property: "capsuleWidth"
+            property: "avoidanceWidth"
             value: panel.width
         }
 
@@ -169,18 +78,12 @@ PanelWindow {
             value: root.screenW
         }
 
-        Binding {
-            target: BarState
-            property: "capsuleCenterX"
-            value: root.screenW / 2 - root.implicitWidth / 2
-                + BarState.yieldShift + panel.width / 2
-        }
-
-        // 模块装载：清单驱动，左中右三区。集体避让由 ModuleHost 内部处理。
+        // 模块装载：清单驱动，左中右三区。水平避让由各胶囊分别处理。
         ModuleHost {
             id: host
 
             configDir: Quickshell.env("HOME") + "/Projects/omibar"
+            neutralScreenX: root.screenW / 2 - panel.width / 2
             height: parent.height
             width: contentWidth
         }

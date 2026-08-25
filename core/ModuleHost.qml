@@ -12,6 +12,7 @@ Item {
     id: root
 
     required property string configDir
+    required property real neutralScreenX
 
     readonly property url barConfigUrl: Qt.resolvedUrl(configDir + "/bar.json")
     property var manifest: []   // [{name, align, options}]
@@ -20,9 +21,9 @@ Item {
     readonly property real moduleSpacing: 10
     readonly property real hPadding: 16
 
-    readonly property real leftCapsuleWidth: capsuleWidthFor(leftRow)
-    readonly property real centerCapsuleWidth: capsuleWidthFor(centerRow)
-    readonly property real rightCapsuleWidth: capsuleWidthFor(rightRow)
+    readonly property real leftCapsuleWidth: capsuleWidthFor(leftCapsule.moduleRow)
+    readonly property real centerCapsuleWidth: capsuleWidthFor(centerCapsule.moduleRow)
+    readonly property real rightCapsuleWidth: capsuleWidthFor(rightCapsule.moduleRow)
     readonly property real sideWidth: Math.max(leftCapsuleWidth, rightCapsuleWidth)
     readonly property real centerBandWidth: centerCapsuleWidth
         + (sideWidth > 0 ? (sideWidth + moduleSpacing) * 2 : 0)
@@ -33,70 +34,46 @@ Item {
     // 不用 childrenRect（会与 anchors.fill 形成循环依赖）。
     readonly property real contentWidth: hPadding * 2
         + Math.max(centerBandWidth, sideBandWidth)
+    readonly property real centerCapsuleX: (width - centerCapsuleWidth) / 2
+    readonly property real rightCapsuleX: width - rightCapsuleWidth
 
     // 三区水平排布：每个非空区都是独立胶囊。
-    Rectangle {
+    AvoidingCapsule {
         id: leftCapsule
 
-        visible: leftCapsuleWidth > 0
-        width: leftCapsuleWidth
-        height: parent.height
-        radius: height / 2
-        color: "#0a0a0c"
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-
-        Row {
-            id: leftRow
-            objectName: "moduleRowLeft"
-            anchors.centerIn: parent
-            spacing: root.moduleSpacing
-        }
+        neutralX: 0
+        neutralScreenX: root.neutralScreenX
+        capsuleWidth: root.leftCapsuleWidth
+        moduleSpacing: root.moduleSpacing
+        rowObjectName: "moduleRowLeft"
     }
 
-    Rectangle {
+    AvoidingCapsule {
         id: centerCapsule
 
-        visible: centerCapsuleWidth > 0
-        width: centerCapsuleWidth
-        height: parent.height
-        radius: height / 2
-        color: "#0a0a0c"
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
-
-        Row {
-            id: centerRow
-            objectName: "moduleRowCenter"
-            anchors.centerIn: parent
-            spacing: root.moduleSpacing
-        }
+        neutralX: root.centerCapsuleX
+        neutralScreenX: root.neutralScreenX
+        capsuleWidth: root.centerCapsuleWidth
+        moduleSpacing: root.moduleSpacing
+        rowObjectName: "moduleRowCenter"
     }
 
-    Rectangle {
+    AvoidingCapsule {
         id: rightCapsule
 
-        visible: rightCapsuleWidth > 0
-        width: rightCapsuleWidth
-        height: parent.height
-        radius: height / 2
-        color: "#0a0a0c"
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-
-        Row {
-            id: rightRow
-            objectName: "moduleRowRight"
-            anchors.centerIn: parent
-            spacing: root.moduleSpacing
-        }
+        neutralX: root.rightCapsuleX
+        neutralScreenX: root.neutralScreenX
+        capsuleWidth: root.rightCapsuleWidth
+        moduleSpacing: root.moduleSpacing
+        rowObjectName: "moduleRowRight"
     }
 
     onManifestChanged: rebuild()
 
     // 清单变化时全量重建；模块数量少，重建比增量 diff 更简单可靠。
     function rebuild(): void {
-        for (const row of [leftRow, centerRow, rightRow]) {
+        for (const row of [leftCapsule.moduleRow, centerCapsule.moduleRow,
+                           rightCapsule.moduleRow]) {
             for (let i = row.children.length - 1; i >= 0; --i)
                 row.children[i].destroy();
         }
@@ -126,10 +103,10 @@ Item {
         return componentCache[name];
     }
 
-    function rowFor(align): Row {
-        if (align === "center") return centerRow;
-        if (align === "right") return rightRow;
-        return leftRow;
+    function rowFor(align): Item {
+        if (align === "center") return centerCapsule.moduleRow;
+        if (align === "right") return rightCapsule.moduleRow;
+        return leftCapsule.moduleRow;
     }
 
     function capsuleWidthFor(row): real {

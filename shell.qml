@@ -24,7 +24,6 @@ ShellRoot {
 
         function demoYield(): void {
             Core.BarState.launcherOpen = !Core.BarState.launcherOpen;
-            Core.BarState.deformPulse++;
         }
 
         function debugNotifications(): string {
@@ -40,8 +39,8 @@ ShellRoot {
             return JSON.stringify({
                 launcherOpen: Core.BarState.launcherOpen,
                 fullscreen: Core.BarState.fullscreen,
-                yieldShift: Core.BarState.yieldShift,
-                capsuleCenterX: Core.BarState.capsuleCenterX
+                avoidanceInset: Core.BarState.avoidanceInset,
+                launcherCenterX: Core.BarState.launcherCenterX
             });
         }
     }

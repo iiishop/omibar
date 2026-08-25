@@ -18,7 +18,6 @@ QtObject {
     property bool caelestiaAvailable: false
     property bool launcherOpen: false
     property real screenWidth: 0
-    property real capsuleCenterX: screenWidth / 2
     property int deformPulse: 0
     readonly property real launcherWidth: 630
     readonly property real launcherPadding: 14
@@ -29,14 +28,11 @@ QtObject {
     property bool notificationDnd: false
     property bool notificationStateReady: false
 
-    // ---- 避让派生状态 ----
-    readonly property bool shouldYield: fullscreen || launcherOpen
-
-    property real capsuleWidth: 0
+    property real avoidanceWidth: 0
     readonly property real launcherLeft: (screenWidth - launcherWidth) / 2
     readonly property real launcherRight: launcherLeft + launcherWidth
     readonly property real launcherCenterX: screenWidth / 2
-    readonly property real yieldDirection: capsuleCenterX <= launcherCenterX ? -1 : 1
-    readonly property real yieldShift: (launcherWidth + capsuleWidth) / 2 + launcherPadding
+    readonly property real avoidanceInset: (launcherWidth + avoidanceWidth) / 2
+        + launcherPadding
 
 }
