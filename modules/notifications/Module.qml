@@ -1,4 +1,4 @@
-// notifications 模块 — 显示 caelestia 未读通知数或 DND 状态。
+// notifications module - compact Caelestia-style inbox status.
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -11,35 +11,54 @@ Item {
 
     readonly property int count: barState.notificationCount
     readonly property bool dnd: barState.notificationDnd
-    readonly property string countText: count > 99 ? "99+" : String(count)
+    readonly property bool hasUnread: count > 0
+    readonly property string iconName: dnd ? "notifications_paused"
+        : (hasUnread ? "notifications_unread" : "notifications")
+    readonly property string statusText: dnd ? "quiet"
+        : (hasUnread ? (count > 99 ? "99+" : String(count)) : "clear")
+    readonly property color accent: dnd ? Theme.primary : Theme.secondary
+    readonly property int iconSize: 18
+    readonly property int labelSize: 12
+    readonly property int gap: 7
 
-    implicitWidth: row.implicitWidth
-    implicitHeight: row.implicitHeight
+    implicitWidth: layout.implicitWidth
+    implicitHeight: layout.implicitHeight
     width: implicitWidth
     height: implicitHeight
     visible: true
 
     Row {
-        id: row
+        id: layout
 
-        spacing: 6
         anchors.centerIn: parent
+        spacing: root.gap
 
         Text {
-            text: root.dnd ? "DND" : "N"
-            color: root.dnd ? Theme.primary : Theme.fgVariant
-            font.family: "monospace"
-            font.pixelSize: 12
-            font.bold: root.dnd
             anchors.verticalCenter: parent.verticalCenter
+            text: root.iconName
+            color: root.accent
+            renderType: Text.NativeRendering
+            font.family: Theme.iconFont
+            font.pixelSize: root.iconSize
+            font.variableAxes: { "FILL": root.hasUnread || root.dnd ? 1 : 0, "GRAD": -25 }
+
+            Behavior on color {
+                ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
         }
 
         Text {
-            text: root.countText
-            color: Theme.fg
-            font.family: "monospace"
-            font.pixelSize: 14
             anchors.verticalCenter: parent.verticalCenter
+            text: root.statusText
+            color: root.hasUnread || root.dnd ? Theme.fg : Theme.fgVariant
+            renderType: Text.NativeRendering
+            font.family: Theme.bodyFont
+            font.pixelSize: root.labelSize
+            font.weight: root.hasUnread || root.dnd ? Font.Medium : Font.Normal
+
+            Behavior on color {
+                ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
         }
     }
 

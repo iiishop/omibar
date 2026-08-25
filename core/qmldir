@@ -4,5 +4,6 @@ singleton HyprEvents 1.0 HyprEvents.qml
 singleton CaelestiaBridge 1.0 CaelestiaBridge.qml
 singleton Theme 1.0 Theme.qml
 AvoidingCapsule 1.0 AvoidingCapsule.qml
+JellyMotion 1.0 JellyMotion.qml
 BarWindow 1.0 BarWindow.qml
 ModuleHost 1.0 ModuleHost.qml

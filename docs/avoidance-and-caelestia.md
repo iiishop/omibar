@@ -8,9 +8,12 @@ its optional caelestia integration.
 - `core/BarState.qml` is the state source used by geometry and modules.
 - `core/CaelestiaBridge.qml` is the only boundary that calls caelestia IPC.
 - `core/HyprEvents.qml` translates Hyprland events into state refresh requests.
+- `core/Theme.qml` adapts caelestia's generated Material 3 colour scheme into
+  omibar's local semantic slots.
 - `core/BarWindow.qml` owns the layer-shell window and outer vertical motion.
 - `core/ModuleHost.qml` owns module placement and per-section capsules.
 - `core/AvoidingCapsule.qml` owns per-capsule launcher avoidance and deformation.
+- `core/JellyMotion.qml` owns reusable squash, recoil, and inertial lag motion.
 
 Modules should not query caelestia directly. They read `BarState` and call bridge
 methods.
@@ -81,12 +84,17 @@ neutral x position.
 Avoidance animation stays inside the bar internals:
 
 - `AvoidingCapsule.Behavior on x` gives each capsule a fixed-duration
-  `OutCubic` travel animation, so launcher state changes do not overshoot.
+  `OutCubic` travel animation. Leaving avoidance is shorter than entering it.
 - `AvoidingCapsule.Behavior on width` smooths capsule width changes.
 - `BarWindow.Behavior on y` smooths fullscreen vertical avoidance.
-- `AvoidingCapsule.deformAnimation` applies a small squeeze and rebound through
-  `Scale`. It restarts from the current scale instead of snapping back to `1`
-  first.
+- `AvoidingCapsule` keeps a stable base capsule under the animated surface, so
+  squash and recoil never expose a transparent edge.
+- `JellyMotion` gives the capsule surface a jelly response: stretch on the
+  travel axis, recoil past neutral, then spring back to `1`. The module row is
+  not scaled with the surface, so labels stay readable.
+- `JellyMotion` gives the module row a lighter 14 px inertial lag opposite the
+  current travel direction, then returns it to zero. No decorative trail or
+  persistent effect remains after avoidance settles.
 
 Do not animate `PanelWindow.visible` or move the `PanelWindow` itself. Layer-shell
 animations and compositor layer transitions can otherwise combine in surprising
@@ -95,8 +103,10 @@ ways.
 ## Capsules
 
 `ModuleHost` draws separate capsules for non-empty left, center, and right
-sections. The outer `panel` is transparent and only provides the neutral
-coordinate space.
+sections. Capsule surfaces use `Theme.surfaceContainer` and
+`Theme.surfaceContainerHigh`, which are populated from caelestia's generated M3
+scheme when available. The outer `panel` is transparent and only provides the
+neutral coordinate space.
 
 The content width keeps the center section visually centered by reserving equal
 space for the wider side:
