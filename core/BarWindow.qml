@@ -43,8 +43,8 @@ PanelWindow {
                     "SIG:", Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || "(unset!)");
     }
 
-    // 胶囊本体：宽度由模块内容驱动
-    Rectangle {
+    // 外层只负责整组移动和形变；每个非空区域的胶囊由 ModuleHost 绘制。
+    Item {
         id: panel
 
         readonly property real targetWidth: host.contentWidth > 0
@@ -58,9 +58,6 @@ PanelWindow {
 
         width: targetWidth
         height: root.capsuleHeight
-
-        radius: height / 2          // 全圆角胶囊
-        color: "#0a0a0c"            // 灵动岛近黑：岛是"屏幕上的洞"，不跟主题
 
         opacity: 1.0
 

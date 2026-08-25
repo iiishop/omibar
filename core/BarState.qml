@@ -25,6 +25,9 @@ QtObject {
 
     property bool dashboardOpen: false
     property bool sidebarOpen: false
+    property int notificationCount: 0
+    property bool notificationDnd: false
+    property bool notificationStateReady: false
 
     // ---- 避让派生状态 ----
     readonly property bool shouldYield: fullscreen || launcherOpen

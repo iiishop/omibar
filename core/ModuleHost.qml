@@ -20,36 +20,76 @@ Item {
     readonly property real moduleSpacing: 10
     readonly property real hPadding: 16
 
-    // 内容总宽度：三区之和 + 区间距。供胶囊 implicitWidth 链使用，
-    // 不用 childrenRect（会与 anchors.fill 形成循环依赖）。
-    readonly property real contentWidth: leftRow.implicitWidth + centerRow.implicitWidth
-        + rightRow.implicitWidth + moduleSpacing * 2
+    readonly property real leftCapsuleWidth: capsuleWidthFor(leftRow)
+    readonly property real centerCapsuleWidth: capsuleWidthFor(centerRow)
+    readonly property real rightCapsuleWidth: capsuleWidthFor(rightRow)
+    readonly property real sideWidth: Math.max(leftCapsuleWidth, rightCapsuleWidth)
+    readonly property real centerBandWidth: centerCapsuleWidth
+        + (sideWidth > 0 ? (sideWidth + moduleSpacing) * 2 : 0)
+    readonly property real sideBandWidth: leftCapsuleWidth + rightCapsuleWidth
+        + (leftCapsuleWidth > 0 && rightCapsuleWidth > 0 ? moduleSpacing : 0)
 
-    // 三区水平排布：左区贴左、中区居中、右区贴右，垂直统一居中。
-    Row {
-        id: leftRow
-        objectName: "moduleRowLeft"
+    // 内容总宽度：中区要保持视觉居中，因此左右按较宽侧对称预留。
+    // 不用 childrenRect（会与 anchors.fill 形成循环依赖）。
+    readonly property real contentWidth: hPadding * 2
+        + Math.max(centerBandWidth, sideBandWidth)
+
+    // 三区水平排布：每个非空区都是独立胶囊。
+    Rectangle {
+        id: leftCapsule
+
+        visible: leftCapsuleWidth > 0
+        width: leftCapsuleWidth
+        height: parent.height
+        radius: height / 2
+        color: "#0a0a0c"
         anchors.left: parent.left
-        anchors.leftMargin: root.hPadding
         anchors.verticalCenter: parent.verticalCenter
-        spacing: root.moduleSpacing
+
+        Row {
+            id: leftRow
+            objectName: "moduleRowLeft"
+            anchors.centerIn: parent
+            spacing: root.moduleSpacing
+        }
     }
 
-    Row {
-        id: centerRow
-        objectName: "moduleRowCenter"
+    Rectangle {
+        id: centerCapsule
+
+        visible: centerCapsuleWidth > 0
+        width: centerCapsuleWidth
+        height: parent.height
+        radius: height / 2
+        color: "#0a0a0c"
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
-        spacing: root.moduleSpacing
+
+        Row {
+            id: centerRow
+            objectName: "moduleRowCenter"
+            anchors.centerIn: parent
+            spacing: root.moduleSpacing
+        }
     }
 
-    Row {
-        id: rightRow
-        objectName: "moduleRowRight"
+    Rectangle {
+        id: rightCapsule
+
+        visible: rightCapsuleWidth > 0
+        width: rightCapsuleWidth
+        height: parent.height
+        radius: height / 2
+        color: "#0a0a0c"
         anchors.right: parent.right
-        anchors.rightMargin: root.hPadding
         anchors.verticalCenter: parent.verticalCenter
-        spacing: root.moduleSpacing
+
+        Row {
+            id: rightRow
+            objectName: "moduleRowRight"
+            anchors.centerIn: parent
+            spacing: root.moduleSpacing
+        }
     }
 
     onManifestChanged: rebuild()
@@ -90,6 +130,10 @@ Item {
         if (align === "center") return centerRow;
         if (align === "right") return rightRow;
         return leftRow;
+    }
+
+    function capsuleWidthFor(row): real {
+        return row.implicitWidth > 0 ? row.implicitWidth + hPadding * 2 : 0;
     }
 
     // ---- 清单加载 ----

@@ -1,5 +1,6 @@
 {
   "modules": [
+    { "name": "notifications", "align": "right" },
     { "name": "clock", "align": "center" }
   ]
 }

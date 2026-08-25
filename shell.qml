@@ -26,6 +26,24 @@ ShellRoot {
             Core.BarState.launcherOpen = !Core.BarState.launcherOpen;
             Core.BarState.deformPulse++;
         }
+
+        function debugNotifications(): string {
+            return JSON.stringify({
+                ready: Core.BarState.notificationStateReady,
+                count: Core.BarState.notificationCount,
+                dnd: Core.BarState.notificationDnd,
+                available: Core.BarState.caelestiaAvailable
+            });
+        }
+
+        function debugLauncher(): string {
+            return JSON.stringify({
+                launcherOpen: Core.BarState.launcherOpen,
+                fullscreen: Core.BarState.fullscreen,
+                yieldShift: Core.BarState.yieldShift,
+                capsuleCenterX: Core.BarState.capsuleCenterX
+            });
+        }
     }
 
     Core.BarWindow {}

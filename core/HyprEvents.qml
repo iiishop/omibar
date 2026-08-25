@@ -18,9 +18,10 @@ QtObject {
         } else if (name === "activewindow") {
             // payload: class, title；空 class = 无活动窗口
             BarState.activeWindowTitle = event.data[0] === "" ? "" : (event.data[1] ?? "");
+            CaelestiaBridge.refreshLauncherSoon();
         } else if (name === "openwindow" || name === "closewindow"
                    || name === "openlayer" || name === "closelayer") {
-            CaelestiaBridge.refreshLauncher();
+            CaelestiaBridge.refreshLauncherSoon();
         }
     }
 
