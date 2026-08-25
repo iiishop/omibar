@@ -70,19 +70,23 @@ so the `PanelWindow` remains wide enough for either side movement.
 Each `AvoidingCapsule` derives its own neutral screen center from
 `ModuleHost.neutralScreenX + neutralX + width / 2`. When `launcherOpen` is true,
 the capsule moves left if its neutral center is at or left of launcher center,
-and right otherwise. Its shift is `(launcherWidth + width) / 2 + launcherPadding`.
-When `launcherOpen` becomes false, the same binding returns that capsule to its
+and right otherwise. The final position is edge based: a left-moving capsule
+places its right edge at `launcherLeft - launcherPadding`, and a right-moving
+capsule places its left edge at `launcherRight + launcherPadding`. When
+`launcherOpen` becomes false, the same binding returns that capsule to its
 neutral x position.
 
 ## Animation
 
 Avoidance animation stays inside the bar internals:
 
-- `AvoidingCapsule.Behavior on x` gives each capsule its spring movement.
+- `AvoidingCapsule.Behavior on x` gives each capsule a fixed-duration
+  `OutCubic` travel animation, so launcher state changes do not overshoot.
 - `AvoidingCapsule.Behavior on width` smooths capsule width changes.
 - `BarWindow.Behavior on y` smooths fullscreen vertical avoidance.
-- `AvoidingCapsule.deformAnimation` applies a short squeeze and rebound through
-  `Scale`.
+- `AvoidingCapsule.deformAnimation` applies a small squeeze and rebound through
+  `Scale`. It restarts from the current scale instead of snapping back to `1`
+  first.
 
 Do not animate `PanelWindow.visible` or move the `PanelWindow` itself. Layer-shell
 animations and compositor layer transitions can otherwise combine in surprising

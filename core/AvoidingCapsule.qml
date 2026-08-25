@@ -12,13 +12,20 @@ Rectangle {
     required property real moduleSpacing
     required property string rowObjectName
 
+    readonly property real leftX: neutralScreenX + neutralX
+    readonly property real rightX: leftX + width
     readonly property real centerX: neutralScreenX + neutralX + width / 2
     readonly property real yieldDirection: centerX <= BarState.launcherCenterX ? -1 : 1
-    readonly property real yieldShift: (BarState.launcherWidth + width) / 2
-        + BarState.launcherPadding
+    readonly property real leftYieldOffset: BarState.launcherLeft
+        - BarState.launcherPadding - rightX
+    readonly property real rightYieldOffset: BarState.launcherRight
+        + BarState.launcherPadding - leftX
     readonly property real yieldOffset: BarState.launcherOpen
-        ? yieldDirection * yieldShift : 0
+        ? (yieldDirection < 0 ? leftYieldOffset : rightYieldOffset) : 0
     readonly property Item moduleRow: row
+    readonly property int travelDuration: 230
+    readonly property int compressDuration: 90
+    readonly property int reboundDuration: 120
 
     property real deformX: 1.0
     property real deformY: 1.0
@@ -33,8 +40,6 @@ Rectangle {
 
     function playDeform(): void {
         deformAnimation.stop();
-        deformX = 1.0;
-        deformY = 1.0;
         deformAnimation.start();
     }
 
@@ -49,7 +54,10 @@ Rectangle {
         SpringAnimation { spring: 3; damping: 0.62; mass: 0.8 }
     }
     Behavior on x {
-        SpringAnimation { spring: 4; damping: 0.6; mass: 1.0 }
+        NumberAnimation {
+            duration: root.travelDuration
+            easing.type: Easing.OutCubic
+        }
     }
 
     SequentialAnimation {
@@ -59,15 +67,15 @@ Rectangle {
             NumberAnimation {
                 target: root
                 property: "deformX"
-                to: 0.72
-                duration: 130
+                to: 0.9
+                duration: root.compressDuration
                 easing.type: Easing.OutQuad
             }
             NumberAnimation {
                 target: root
                 property: "deformY"
-                to: 1.18
-                duration: 130
+                to: 1.06
+                duration: root.compressDuration
                 easing.type: Easing.OutQuad
             }
         }
@@ -75,15 +83,15 @@ Rectangle {
             NumberAnimation {
                 target: root
                 property: "deformX"
-                to: 1.14
-                duration: 115
+                to: 1.035
+                duration: root.reboundDuration
                 easing.type: Easing.OutCubic
             }
             NumberAnimation {
                 target: root
                 property: "deformY"
-                to: 0.92
-                duration: 115
+                to: 0.98
+                duration: root.reboundDuration
                 easing.type: Easing.OutCubic
             }
         }
@@ -93,7 +101,7 @@ Rectangle {
                 property: "deformX"
                 to: 1.0
                 spring: 4
-                damping: 0.28
+                damping: 0.55
                 mass: 0.8
                 epsilon: 0.002
             }
@@ -102,7 +110,7 @@ Rectangle {
                 property: "deformY"
                 to: 1.0
                 spring: 4
-                damping: 0.28
+                damping: 0.55
                 mass: 0.8
                 epsilon: 0.002
             }
