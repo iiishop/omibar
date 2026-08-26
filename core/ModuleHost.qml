@@ -18,6 +18,7 @@ Item {
     property var manifest: []   // [{name, align, options}]
     // 组件缓存按模块名共享；同一模块出现多次时只编译一份，实例各自独立。
     property var componentCache: ({})
+    property Component hoverComponent: Component { ModuleHover {} }
     readonly property real moduleSpacing: 10
     readonly property real hPadding: 16
 
@@ -83,10 +84,17 @@ Item {
                 console.warn("[omibar] skip module:", entry.name);
                 continue;
             }
+            const wrapper = hoverComponent.createObject(
+                rowFor(entry.align), { hoverPreset: hoverPresetFor(entry) });
+            if (!wrapper) {
+                console.warn("[omibar] create hover wrapper failed:", entry.name);
+                continue;
+            }
             const instance = component.createObject(
-                rowFor(entry.align), { barState: BarState });
+                wrapper.contentParent, { barState: BarState });
             if (!instance) {
                 console.warn("[omibar] create failed:", entry.name);
+                wrapper.destroy();
                 continue;
             }
             const options = entry.options ?? {};
@@ -107,6 +115,11 @@ Item {
         if (align === "center") return centerCapsule.moduleRow;
         if (align === "right") return rightCapsule.moduleRow;
         return leftCapsule.moduleRow;
+    }
+
+    function hoverPresetFor(entry): string {
+        const preset = entry.hover ?? entry.hoverAnimation ?? "lift";
+        return typeof preset === "string" ? preset : "lift";
     }
 
     function capsuleWidthFor(row): real {

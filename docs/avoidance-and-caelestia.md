@@ -14,6 +14,9 @@ its optional caelestia integration.
 - `core/ModuleHost.qml` owns module placement and per-section capsules.
 - `core/AvoidingCapsule.qml` owns per-capsule launcher avoidance and deformation.
 - `core/JellyMotion.qml` owns reusable squash, recoil, and inertial lag motion.
+- `core/ModuleHover.qml` owns per-module hover hit targets and visual shells.
+- `core/HoverMotion.qml` owns reusable hover response presets. It is separate
+  from `JellyMotion`, which remains dedicated to travel/avoidance motion.
 
 Modules should not query caelestia directly. They read `BarState` and call bridge
 methods.
@@ -95,6 +98,11 @@ Avoidance animation stays inside the bar internals:
 - `JellyMotion` gives the module row a lighter 14 px inertial lag opposite the
   current travel direction, then returns it to zero. No decorative trail or
   persistent effect remains after avoidance settles.
+- `ModuleHost` wraps every loaded module in `ModuleHover`. The manifest can set
+  `hover` to `lift`, `jelly`, `glow`, or `none`; missing values use `lift`.
+- Hover animation is intentionally separate from avoidance animation. Hover
+  changes module content scale/y and a small local surface opacity only; it does
+  not change capsule x, width, or launcher avoidance state.
 
 Do not animate `PanelWindow.visible` or move the `PanelWindow` itself. Layer-shell
 animations and compositor layer transitions can otherwise combine in surprising

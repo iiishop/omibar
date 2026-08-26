@@ -12,7 +12,7 @@ caelestia-shell 是可选集成：存在时，omibar 可读取它的公开 IPC �
 
 ## 模块契约
 
-每个模块提供 `modules/<name>/Module.qml`（内容渲染）+ `module.json`（声明 name / align / description）。动画、间距、hover 由 ModuleHost 统一施加，模块不写自己的进出场动画。
+每个模块提供 `modules/<name>/Module.qml`（内容渲染）+ `module.json`（声明 name / align / description）。动画、间距、hover 由 ModuleHost 统一施加，模块不写自己的进出场动画。`bar.json` entries may set `hover` (`lift`, `jelly`, `glow`, `none`) per module.
 
 ## 运行
 
