@@ -13,6 +13,7 @@ Item {
     readonly property int metadataSize: 10
     readonly property int iconSize: 18
     readonly property int buttonSize: 24
+    readonly property int controlGap: 5
     readonly property int spectrumBars: 18
     readonly property int sideSpectrumBars: 7
     readonly property int lyricSideInset: showLyrics ? 20 : 0
@@ -35,6 +36,10 @@ Item {
     readonly property string sourceLyric: showLyrics
         ? barState.mediaLyric
         : (barState.mediaAvailable ? "" : "没有播放中的媒体")
+    readonly property string playModeIcon: barState.mediaPlayMode === "shuffle"
+        ? "shuffle"
+        : (barState.mediaPlayMode === "repeatTrack" ? "repeat_one" : "playlist_play")
+    readonly property bool playModeActive: barState.mediaPlayMode !== "sequential"
 
     property string displayedLyric: sourceLyric
     property real lyricOpacity: showLyricText ? 1 : 0
@@ -297,8 +302,15 @@ Item {
         id: controls
 
         anchors.centerIn: parent
-        spacing: 7
+        spacing: root.controlGap
         opacity: root.hovered && root.barState.mediaAvailable ? 1 : 0
+
+        MediaButton {
+            iconName: root.playModeIcon
+            highlighted: root.playModeActive
+            enabled: root.barState.mediaPlayModeAvailable
+            onClicked: MediaController.cyclePlayMode()
+        }
 
         MediaButton {
             iconName: "skip_previous"
@@ -394,6 +406,7 @@ Item {
         id: buttonRoot
 
         required property string iconName
+        property bool highlighted: false
         signal clicked()
 
         width: root.buttonSize
@@ -403,7 +416,10 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: height / 2
-            color: mouseArea.containsMouse
+            color: buttonRoot.highlighted
+                ? Qt.rgba(Theme.secondaryContainer.r, Theme.secondaryContainer.g,
+                    Theme.secondaryContainer.b, mouseArea.containsMouse ? 0.78 : 0.58)
+                : mouseArea.containsMouse
                 ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.16)
                 : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
 
@@ -415,7 +431,7 @@ Item {
         Text {
             anchors.centerIn: parent
             text: buttonRoot.iconName
-            color: Theme.fg
+            color: buttonRoot.highlighted ? Theme.primary : Theme.fg
             renderType: Text.NativeRendering
             font.family: Theme.iconFont
             font.pixelSize: root.iconSize

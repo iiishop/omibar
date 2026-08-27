@@ -39,6 +39,8 @@ QtObject {
     property bool mediaLyricsAvailable: false
     property string mediaLyric: ""
     property var mediaSpectrum: []
+    property string mediaPlayMode: "sequential"
+    property bool mediaPlayModeAvailable: false
     readonly property real mediaProgress: mediaLength > 0
         ? Math.max(0, Math.min(1, mediaPosition / mediaLength))
         : 0

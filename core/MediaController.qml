@@ -21,8 +21,6 @@ QtObject {
     readonly property int lyricLineOffset: 1
 
     property string trackKey: ""
-    property string lyricRequestKey: ""
-    property string lyricOutput: ""
     property real positionAnchor: 0
     property real positionAnchorMs: 0
     property var lyricEntries: []
@@ -54,6 +52,7 @@ QtObject {
         if (player === null) {
             trackKey = "";
             lyricEntries = [];
+            LyricsProvider.clearTrack();
             positionAnchor = 0;
             positionAnchorMs = 0;
             BarState.mediaAvailable = false;
@@ -67,6 +66,8 @@ QtObject {
             BarState.mediaLyricsAvailable = false;
             BarState.mediaLyric = "";
             BarState.mediaSpectrum = [];
+            BarState.mediaPlayMode = "sequential";
+            BarState.mediaPlayModeAvailable = false;
             return;
         }
 
@@ -77,11 +78,12 @@ QtObject {
         BarState.mediaAlbum = textValue(player.trackAlbum);
         BarState.mediaLength = secondsValue(player.length);
         syncPosition(player);
+        refreshPlayMode();
 
         const nextKey = currentKey(player);
         if (nextKey !== trackKey) {
             trackKey = nextKey;
-            fetchLyrics(player);
+            requestLyrics(player);
         }
         updateLyric();
     }
@@ -109,78 +111,30 @@ QtObject {
         updateLyric();
     }
 
-    function fetchLyrics(player: MprisPlayer): void {
-        lyricEntries = [];
-        lyricOutput = "";
-        lyricRequestKey = trackKey;
+    function requestLyrics(player: MprisPlayer): void {
+        LyricsProvider.setTrack(
+            trackKey,
+            textValue(player.trackArtist),
+            textValue(player.trackTitle),
+            textValue(player.trackAlbum),
+            secondsValue(player.length)
+        );
+        syncLyrics();
+    }
+
+    function syncLyrics(): void {
+        if (LyricsProvider.requestKey !== trackKey)
+            return;
+
+        lyricEntries = LyricsProvider.entries;
+        BarState.mediaLyricsLoading = LyricsProvider.loading;
         BarState.mediaLyricsAvailable = false;
         BarState.mediaLyric = "";
-        BarState.mediaLyricsLoading = BarState.mediaTitle !== "";
 
-        if (BarState.mediaTitle === "") {
-            BarState.mediaLyricsLoading = false;
-            return;
-        }
-
-        if (lyricsProc.running)
-            lyricsProc.running = false;
-
-        lyricsProc.command = [
-            "curl", "-LsfG", "--max-time", "6",
-            "--data-urlencode", "artist_name=" + BarState.mediaArtist,
-            "--data-urlencode", "track_name=" + BarState.mediaTitle,
-            "--data-urlencode", "album_name=" + BarState.mediaAlbum,
-            "--data-urlencode", "duration=" + String(Math.round(BarState.mediaLength)),
-            "https://lrclib.net/api/get"
-        ];
-        lyricsProc.running = true;
-    }
-
-    function applyLyrics(output: string): void {
-        if (lyricRequestKey !== trackKey)
-            return;
-
-        BarState.mediaLyricsLoading = false;
-        if (output.trim() === "") {
-            lyricEntries = [];
-            BarState.mediaLyricsAvailable = false;
-            BarState.mediaLyric = "";
-            return;
-        }
-
-        try {
-            const data = JSON.parse(output);
-            lyricEntries = parseLrc(data.syncedLyrics ?? "");
-            BarState.mediaLyricsAvailable = hasLyrics;
+        if (hasLyrics) {
+            BarState.mediaLyricsAvailable = true;
             updateLyric();
-        } catch (e) {
-            console.warn("[omibar] lyrics parse failed:", e);
-            lyricEntries = [];
-            BarState.mediaLyricsAvailable = false;
-            BarState.mediaLyric = "";
         }
-    }
-
-    function parseLrc(text: string): var {
-        const entries = [];
-        const lines = text.split("\n");
-        const tagRe = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
-
-        for (const line of lines) {
-            tagRe.lastIndex = 0;
-            const lyricText = line.replace(tagRe, "").trim();
-            let match = tagRe.exec(line);
-            while (match !== null) {
-                entries.push({
-                    time: Number(match[1]) * 60 + Number(match[2]),
-                    text: lyricText
-                });
-                match = tagRe.exec(line);
-            }
-        }
-
-        entries.sort((a, b) => a.time - b.time);
-        return entries;
     }
 
     function updateLyric(): void {
@@ -201,6 +155,59 @@ QtObject {
             currentIndex + lyricLineOffset);
         const current = lyricEntries[displayIndex];
         BarState.mediaLyric = current.text === "" ? "♪" : current.text;
+    }
+
+    function refreshPlayMode(): void {
+        const player = active;
+        if (player === null) {
+            BarState.mediaPlayMode = "sequential";
+            BarState.mediaPlayModeAvailable = false;
+            return;
+        }
+
+        if (player.shuffleSupported && player.shuffle) {
+            BarState.mediaPlayMode = "shuffle";
+        } else if (player.loopSupported && player.loopState === MprisLoopState.Track) {
+            BarState.mediaPlayMode = "repeatTrack";
+        } else {
+            BarState.mediaPlayMode = "sequential";
+        }
+        BarState.mediaPlayModeAvailable = availablePlayModes().length > 1;
+    }
+
+    function availablePlayModes(): var {
+        const player = active;
+        if (player === null || !player.canControl)
+            return [];
+
+        const modes = ["sequential"];
+        if (player.loopSupported)
+            modes.push("repeatTrack");
+        if (player.shuffleSupported)
+            modes.push("shuffle");
+        return modes;
+    }
+
+    function cyclePlayMode(): void {
+        const modes = availablePlayModes();
+        if (modes.length < 2)
+            return;
+
+        const current = modes.indexOf(BarState.mediaPlayMode);
+        applyPlayMode(modes[(current + 1) % modes.length]);
+    }
+
+    function applyPlayMode(mode: string): void {
+        const player = active;
+        if (player === null || !player.canControl)
+            return;
+
+        if (player.shuffleSupported)
+            player.shuffle = mode === "shuffle";
+        if (player.loopSupported)
+            player.loopState = mode === "repeatTrack"
+                ? MprisLoopState.Track : MprisLoopState.None;
+        refreshPlayMode();
     }
 
     function applySpectrum(line: string): void {
@@ -236,6 +243,11 @@ QtObject {
         function onTrackArtistChanged(): void { root.refreshPlayer(); }
         function onTrackAlbumChanged(): void { root.refreshPlayer(); }
         function onLengthChanged(): void { root.refreshPlayer(); }
+        function onCanControlChanged(): void { root.refreshPlayMode(); }
+        function onLoopStateChanged(): void { root.refreshPlayMode(); }
+        function onLoopSupportedChanged(): void { root.refreshPlayMode(); }
+        function onShuffleChanged(): void { root.refreshPlayMode(); }
+        function onShuffleSupportedChanged(): void { root.refreshPlayMode(); }
         function onPositionChanged(): void {
             if (root.active !== null) {
                 root.syncPosition(root.active);
@@ -244,23 +256,18 @@ QtObject {
         }
     }
 
+    readonly property Connections lyricsConnections: Connections {
+        target: LyricsProvider
+
+        function onEntriesChanged(): void { root.syncLyrics(); }
+        function onLoadingChanged(): void { root.syncLyrics(); }
+    }
+
     readonly property Timer positionTimer: Timer {
         interval: 300
         running: root.active !== null
         repeat: true
         onTriggered: root.refreshPosition()
-    }
-
-    readonly property Process lyricsProc: Process {
-        id: lyricsProc
-
-        stdout: SplitParser {
-            onRead: data => root.lyricOutput += data
-        }
-        stderr: SplitParser {}
-        onExited: (code, status) => {
-            root.applyLyrics(code === 0 ? root.lyricOutput : "");
-        }
     }
 
     readonly property Process cavaProc: Process {
