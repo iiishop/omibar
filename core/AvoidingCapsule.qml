@@ -8,6 +8,7 @@ Item {
 
     required property real neutralX
     required property real neutralScreenX
+    required property real movementOriginX
     required property real capsuleWidth
     required property real moduleGap
     required property real leftStackOffset
@@ -30,14 +31,16 @@ Item {
     readonly property real jellyLag: 14
     readonly property real contentLagRatio: 0.65
     readonly property real lagTarget: -motionDirection * jellyLag
-    readonly property real gapCompression: Math.min(3, moduleGap * 0.3)
-    readonly property real gapRecoil: Math.min(1.5, moduleGap * 0.15)
+    readonly property real gapCompression: Math.min(6, moduleGap * 0.6)
+    readonly property real gapRecoil: Math.min(3, moduleGap * 0.3)
+    readonly property real gapWaveDelayPx: 700
+    readonly property real gapWaveMaxDelay: 0.44
     readonly property int travelDuration: BarState.launcherOpen ? 280 : 190
 
     property real deformX: 1.0
     property real deformY: 1.0
     property real bodyLag: 0.0
-    property real gapOffset: 0.0
+    property real gapWaveProgress: 0.0
 
     visible: width > 0
     x: neutralX + yieldOffset
@@ -47,18 +50,57 @@ Item {
 
     function playMotion(): void {
         jellyMotion.play();
-        gapMotion.restart();
+        gapWave.restart();
     }
 
     function syncBandItems(): void {
-        const count = row.children.length;
-        const centerIndex = (count - 1) / 2;
-        for (let i = 0; i < count; ++i) {
-            const itemIndex = i;
-            row.children[i].gapImpulseOffset = Qt.binding(
-                () => root.gapOffset * (itemIndex - centerIndex));
-        }
+        applyGapWave();
     }
+
+    function applyGapWave(): void {
+        for (let i = 0; i < row.children.length; ++i)
+            row.children[i].gapImpulseOffset = itemImpulseOffset(i);
+    }
+
+    function itemImpulseOffset(itemIndex: int): real {
+        let offset = 0;
+        for (let gapIndex = 0; gapIndex < row.children.length - 1; ++gapIndex) {
+            const delta = gapDelta(gapIndex);
+            offset += itemIndex <= gapIndex ? -delta / 2 : delta / 2;
+        }
+        return offset;
+    }
+
+    function gapDelta(gapIndex: int): real {
+        const phase = gapWaveProgress - gapDelay(gapIndex);
+        if (phase < 0 || phase > 1)
+            return 0;
+        if (phase < 0.22)
+            return -gapCompression * easeOutQuad(phase / 0.22);
+        if (phase < 0.56)
+            return -gapCompression
+                + (gapCompression + gapRecoil)
+                * easeOutCubic((phase - 0.22) / 0.34);
+        return gapRecoil * (1 - easeOutCubic((phase - 0.56) / 0.44));
+    }
+
+    function gapDelay(gapIndex: int): real {
+        const leftItem = row.children[gapIndex];
+        const gapCenterX = neutralScreenX + neutralX + row.x + leftItem.x
+            + leftItem.width + moduleGap / 2;
+        const distance = Math.abs(gapCenterX - movementOriginX);
+        return Math.min(gapWaveMaxDelay, distance / gapWaveDelayPx);
+    }
+
+    function easeOutQuad(t: real): real {
+        return 1 - (1 - t) * (1 - t);
+    }
+
+    function easeOutCubic(t: real): real {
+        return 1 - Math.pow(1 - t, 3);
+    }
+
+    onGapWaveProgressChanged: applyGapWave()
 
     Behavior on width {
         SpringAnimation { spring: 3; damping: 0.62; mass: 0.8 }
@@ -100,31 +142,19 @@ Item {
         settleDuration: 220
     }
 
-    SequentialAnimation {
-        id: gapMotion
+    NumberAnimation {
+        id: gapWave
 
-        NumberAnimation {
-            target: root
-            property: "gapOffset"
-            to: -root.gapCompression
-            duration: 85
-            easing.type: Easing.OutQuad
-        }
-        NumberAnimation {
-            target: root
-            property: "gapOffset"
-            to: root.gapRecoil
-            duration: 130
-            easing.type: Easing.OutCubic
-        }
-        SpringAnimation {
-            target: root
-            property: "gapOffset"
-            to: 0.0
-            spring: 5.2
-            damping: 0.42
-            mass: 0.72
-            epsilon: 0.002
+        target: root
+        property: "gapWaveProgress"
+        from: 0.0
+        to: 1.0 + root.gapWaveMaxDelay
+        duration: 580
+        easing.type: Easing.Linear
+
+        onStopped: {
+            root.gapWaveProgress = 0.0;
+            root.applyGapWave();
         }
     }
 

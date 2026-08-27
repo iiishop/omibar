@@ -94,9 +94,11 @@ Avoidance animation stays inside the bar internals:
 - `JellyMotion` gives the module row a 14 px inertial lag opposite the current
   travel direction, then returns it to zero. No decorative trail or persistent
   effect remains after avoidance settles.
-- `AvoidingCapsule.syncBandItems()` owns band-local gap impulse offsets for
-  each module. Static row spacing stays equal to `BarState.moduleGap`, so
-  avoidance geometry does not drift while moving.
+- `AvoidingCapsule` treats movement as a band-local gap wave. Each gap gets a
+  phase delay from its neutral distance to `movementOriginX`, then its larger
+  compression/recoil delta contributes visual offsets to the modules on either
+  side. Static row spacing stays equal to `BarState.moduleGap`, so movement
+  geometry does not drift while moving.
 - `ModuleHost` wraps every loaded module in `ModuleHover`. The manifest can set
   `hover` to `lift`, `jelly`, `glow`, or `none`; missing values use `lift`.
 - Hover animation is intentionally separate from avoidance animation. Hover

@@ -13,6 +13,7 @@ Item {
 
     required property string configDir
     required property real neutralScreenX
+    required property real movementOriginX
 
     readonly property url barConfigUrl: Qt.resolvedUrl(configDir + "/bar.json")
     property var manifest: []   // [{name, align, options}]
@@ -46,6 +47,7 @@ Item {
 
         neutralX: 0
         neutralScreenX: root.neutralScreenX
+        movementOriginX: root.movementOriginX
         capsuleWidth: root.leftCapsuleWidth
         moduleGap: root.moduleGap
         leftStackOffset: root.centerCapsuleWidth > 0
@@ -59,6 +61,7 @@ Item {
 
         neutralX: root.centerCapsuleX
         neutralScreenX: root.neutralScreenX
+        movementOriginX: root.movementOriginX
         capsuleWidth: root.centerCapsuleWidth
         moduleGap: root.moduleGap
         leftStackOffset: 0
@@ -71,6 +74,7 @@ Item {
 
         neutralX: root.rightCapsuleX
         neutralScreenX: root.neutralScreenX
+        movementOriginX: root.movementOriginX
         capsuleWidth: root.rightCapsuleWidth
         moduleGap: root.moduleGap
         leftStackOffset: 0

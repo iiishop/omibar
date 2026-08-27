@@ -84,6 +84,7 @@ PanelWindow {
 
             configDir: Quickshell.env("HOME") + "/Projects/omibar"
             neutralScreenX: root.screenW / 2 - panel.width / 2
+            movementOriginX: BarState.launcherCenterX
             height: parent.height
             width: contentWidth
         }
