@@ -17,7 +17,8 @@ QtObject {
         && BarState.mediaPlaying
         && !BarState.mediaLyricsAvailable
     readonly property string cavaCommand: "printf '%s\\n' '[general]' 'bars = 18' '[output]' 'method = raw' 'raw_target = /dev/stdout' 'data_format = ascii' 'ascii_max_range = 1000' > /tmp/omibar-cava.conf && exec cava -p /tmp/omibar-cava.conf"
-    readonly property real lyricLeadSeconds: 0.38
+    readonly property real lyricLeadSeconds: 0.2
+    readonly property int lyricLineOffset: 1
 
     property string trackKey: ""
     property string lyricRequestKey: ""
@@ -189,12 +190,16 @@ QtObject {
         }
 
         const position = BarState.mediaPosition + lyricLeadSeconds;
-        let current = lyricEntries[0];
-        for (const entry of lyricEntries) {
-            if (entry.time > position)
+        let currentIndex = 0;
+        for (let i = 0; i < lyricEntries.length; ++i) {
+            if (lyricEntries[i].time > position)
                 break;
-            current = entry;
+            currentIndex = i;
         }
+
+        const displayIndex = Math.min(lyricEntries.length - 1,
+            currentIndex + lyricLineOffset);
+        const current = lyricEntries[displayIndex];
         BarState.mediaLyric = current.text === "" ? "♪" : current.text;
     }
 
