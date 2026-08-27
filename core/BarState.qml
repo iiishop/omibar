@@ -29,6 +29,8 @@ QtObject {
     property bool notificationStateReady: false
 
     property real avoidanceWidth: 0
+    readonly property real moduleHeight: 32
+    readonly property real moduleGap: 10
     readonly property real launcherLeft: (screenWidth - launcherWidth) / 2
     readonly property real launcherRight: launcherLeft + launcherWidth
     readonly property real launcherCenterX: screenWidth / 2

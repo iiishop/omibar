@@ -19,22 +19,24 @@ Item {
     // 组件缓存按模块名共享；同一模块出现多次时只编译一份，实例各自独立。
     property var componentCache: ({})
     property Component hoverComponent: Component { ModuleHover {} }
-    readonly property real moduleSpacing: 10
-    readonly property real hPadding: 16
+    readonly property real moduleGap: BarState.moduleGap
 
     readonly property real leftCapsuleWidth: capsuleWidthFor(leftCapsule.moduleRow)
     readonly property real centerCapsuleWidth: capsuleWidthFor(centerCapsule.moduleRow)
     readonly property real rightCapsuleWidth: capsuleWidthFor(rightCapsule.moduleRow)
     readonly property real sideWidth: Math.max(leftCapsuleWidth, rightCapsuleWidth)
+    readonly property real leftAvoidanceWidth: leftCapsuleWidth + centerCapsuleWidth
+        + (leftCapsuleWidth > 0 && centerCapsuleWidth > 0 ? moduleGap : 0)
+    readonly property real rightAvoidanceWidth: rightCapsuleWidth
+    readonly property real avoidanceSideWidth: Math.max(leftAvoidanceWidth, rightAvoidanceWidth)
     readonly property real centerBandWidth: centerCapsuleWidth
-        + (sideWidth > 0 ? (sideWidth + moduleSpacing) * 2 : 0)
+        + (sideWidth > 0 ? (sideWidth + moduleGap) * 2 : 0)
     readonly property real sideBandWidth: leftCapsuleWidth + rightCapsuleWidth
-        + (leftCapsuleWidth > 0 && rightCapsuleWidth > 0 ? moduleSpacing : 0)
+        + (leftCapsuleWidth > 0 && rightCapsuleWidth > 0 ? moduleGap : 0)
 
     // 内容总宽度：中区要保持视觉居中，因此左右按较宽侧对称预留。
     // 不用 childrenRect（会与 anchors.fill 形成循环依赖）。
-    readonly property real contentWidth: hPadding * 2
-        + Math.max(centerBandWidth, sideBandWidth)
+    readonly property real contentWidth: Math.max(centerBandWidth, sideBandWidth)
     readonly property real centerCapsuleX: (width - centerCapsuleWidth) / 2
     readonly property real rightCapsuleX: width - rightCapsuleWidth
 
@@ -45,7 +47,10 @@ Item {
         neutralX: 0
         neutralScreenX: root.neutralScreenX
         capsuleWidth: root.leftCapsuleWidth
-        moduleSpacing: root.moduleSpacing
+        moduleGap: root.moduleGap
+        leftStackOffset: root.centerCapsuleWidth > 0
+            ? root.centerCapsuleWidth + root.moduleGap : 0
+        rightStackOffset: 0
         rowObjectName: "moduleRowLeft"
     }
 
@@ -55,7 +60,9 @@ Item {
         neutralX: root.centerCapsuleX
         neutralScreenX: root.neutralScreenX
         capsuleWidth: root.centerCapsuleWidth
-        moduleSpacing: root.moduleSpacing
+        moduleGap: root.moduleGap
+        leftStackOffset: 0
+        rightStackOffset: 0
         rowObjectName: "moduleRowCenter"
     }
 
@@ -65,7 +72,9 @@ Item {
         neutralX: root.rightCapsuleX
         neutralScreenX: root.neutralScreenX
         capsuleWidth: root.rightCapsuleWidth
-        moduleSpacing: root.moduleSpacing
+        moduleGap: root.moduleGap
+        leftStackOffset: 0
+        rightStackOffset: 0
         rowObjectName: "moduleRowRight"
     }
 
@@ -101,6 +110,8 @@ Item {
             for (const key in options)
                 instance[key] = options[key];
         }
+        for (const capsule of [leftCapsule, centerCapsule, rightCapsule])
+            capsule.syncBandItems();
     }
 
     function getComponent(name): Component {
@@ -123,7 +134,7 @@ Item {
     }
 
     function capsuleWidthFor(row): real {
-        return row.implicitWidth > 0 ? row.implicitWidth + hPadding * 2 : 0;
+        return row.implicitWidth;
     }
 
     // ---- 清单加载 ----

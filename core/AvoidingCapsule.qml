@@ -1,4 +1,4 @@
-// AvoidingCapsule - single capsule with launcher avoidance motion.
+// AvoidingCapsule - module band with launcher avoidance motion.
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -9,7 +9,9 @@ Item {
     required property real neutralX
     required property real neutralScreenX
     required property real capsuleWidth
-    required property real moduleSpacing
+    required property real moduleGap
+    required property real leftStackOffset
+    required property real rightStackOffset
     required property string rowObjectName
 
     readonly property real leftX: neutralScreenX + neutralX
@@ -17,9 +19,9 @@ Item {
     readonly property real centerX: neutralScreenX + neutralX + width / 2
     readonly property real yieldDirection: centerX <= BarState.launcherCenterX ? -1 : 1
     readonly property real leftYieldOffset: BarState.launcherLeft
-        - BarState.launcherPadding - rightX
+        - BarState.launcherPadding - leftStackOffset - rightX
     readonly property real rightYieldOffset: BarState.launcherRight
-        + BarState.launcherPadding - leftX
+        + BarState.launcherPadding + rightStackOffset - leftX
     readonly property real yieldOffset: BarState.launcherOpen
         ? (yieldDirection < 0 ? leftYieldOffset : rightYieldOffset) : 0
     readonly property Item moduleRow: row
@@ -28,11 +30,14 @@ Item {
     readonly property real jellyLag: 14
     readonly property real contentLagRatio: 0.65
     readonly property real lagTarget: -motionDirection * jellyLag
+    readonly property real gapCompression: Math.min(3, moduleGap * 0.3)
+    readonly property real gapRecoil: Math.min(1.5, moduleGap * 0.15)
     readonly property int travelDuration: BarState.launcherOpen ? 280 : 190
 
     property real deformX: 1.0
     property real deformY: 1.0
     property real bodyLag: 0.0
+    property real gapOffset: 0.0
 
     visible: width > 0
     x: neutralX + yieldOffset
@@ -42,6 +47,17 @@ Item {
 
     function playMotion(): void {
         jellyMotion.play();
+        gapMotion.restart();
+    }
+
+    function syncBandItems(): void {
+        const count = row.children.length;
+        const centerIndex = (count - 1) / 2;
+        for (let i = 0; i < count; ++i) {
+            const itemIndex = i;
+            row.children[i].gapImpulseOffset = Qt.binding(
+                () => root.gapOffset * (itemIndex - centerIndex));
+        }
     }
 
     Behavior on width {
@@ -54,41 +70,12 @@ Item {
         }
     }
 
-    Rectangle {
-        id: body
-
-        x: 0
-        y: 0
-        width: parent.width
-        height: parent.height
-        radius: height / 2
-        color: Theme.surfaceContainer
-    }
-
-    Rectangle {
-        id: gelSurface
-
-        x: 0
-        y: 1
-        width: parent.width
-        height: parent.height - 2
-        radius: height / 2
-        color: Theme.surfaceContainerHigh
-
-        transform: Scale {
-            xScale: root.deformX
-            yScale: root.deformY
-            origin.x: root.motionDirection < 0 ? gelSurface.width : 0
-            origin.y: gelSurface.height / 2
-        }
-    }
-
     Row {
         id: row
 
         objectName: root.rowObjectName
         anchors.centerIn: parent
-        spacing: root.moduleSpacing
+        spacing: root.moduleGap
 
         transform: Translate {
             x: root.bodyLag * root.contentLagRatio
@@ -111,6 +98,34 @@ Item {
         recoilDuration: 150
         lagDuration: 90
         settleDuration: 220
+    }
+
+    SequentialAnimation {
+        id: gapMotion
+
+        NumberAnimation {
+            target: root
+            property: "gapOffset"
+            to: -root.gapCompression
+            duration: 85
+            easing.type: Easing.OutQuad
+        }
+        NumberAnimation {
+            target: root
+            property: "gapOffset"
+            to: root.gapRecoil
+            duration: 130
+            easing.type: Easing.OutCubic
+        }
+        SpringAnimation {
+            target: root
+            property: "gapOffset"
+            to: 0.0
+            spring: 5.2
+            damping: 0.42
+            mass: 0.72
+            epsilon: 0.002
+        }
     }
 
     Connections {

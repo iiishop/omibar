@@ -11,8 +11,8 @@ its optional caelestia integration.
 - `core/Theme.qml` adapts caelestia's generated Material 3 colour scheme into
   omibar's local semantic slots.
 - `core/BarWindow.qml` owns the layer-shell window and outer vertical motion.
-- `core/ModuleHost.qml` owns module placement and per-section capsules.
-- `core/AvoidingCapsule.qml` owns per-capsule launcher avoidance and deformation.
+- `core/ModuleHost.qml` owns module placement and per-section avoidance bands.
+- `core/AvoidingCapsule.qml` owns per-band launcher avoidance and inertial lag.
 - `core/JellyMotion.qml` owns reusable squash, recoil, and inertial lag motion.
 - `core/ModuleHover.qml` owns per-module hover hit targets and visual shells.
 - `core/HoverMotion.qml` owns reusable hover response presets. It is separate
@@ -63,15 +63,16 @@ state.
 ## Avoidance Geometry
 
 `BarWindow` keeps the `PanelWindow` visible and transparent. The horizontal
-moving objects are the individual capsule items, not the layer-shell window
+moving objects are the individual avoidance bands, not the layer-shell window
 itself.
 
 The shift is derived in `BarState`:
 
 - `launcherWidth` is the expected launcher panel width.
 - `launcherPadding` is the minimum gap between launcher and omibar.
-- `avoidanceInset` is a conservative side inset based on the full panel width,
-so the `PanelWindow` remains wide enough for either side movement.
+- `avoidanceInset` is a conservative side inset based on the widest avoided
+  side stack, so the `PanelWindow` remains wide enough for either side
+  movement.
 
 Each `AvoidingCapsule` derives its own neutral screen center from
 `ModuleHost.neutralScreenX + neutralX + width / 2`. When `launcherOpen` is true,
@@ -86,18 +87,16 @@ neutral x position.
 
 Avoidance animation stays inside the bar internals:
 
-- `AvoidingCapsule.Behavior on x` gives each capsule a fixed-duration
+- `AvoidingCapsule.Behavior on x` gives each avoidance band a fixed-duration
   `OutCubic` travel animation. Leaving avoidance is shorter than entering it.
-- `AvoidingCapsule.Behavior on width` smooths capsule width changes.
+- `AvoidingCapsule.Behavior on width` smooths band width changes.
 - `BarWindow.Behavior on y` smooths fullscreen vertical avoidance.
-- `AvoidingCapsule` keeps a stable base capsule under the animated surface, so
-  squash and recoil never expose a transparent edge.
-- `JellyMotion` gives the capsule surface a jelly response: stretch on the
-  travel axis, recoil past neutral, then spring back to `1`. The module row is
-  not scaled with the surface, so labels stay readable.
-- `JellyMotion` gives the module row a lighter 14 px inertial lag opposite the
-  current travel direction, then returns it to zero. No decorative trail or
-  persistent effect remains after avoidance settles.
+- `JellyMotion` gives the module row a 14 px inertial lag opposite the current
+  travel direction, then returns it to zero. No decorative trail or persistent
+  effect remains after avoidance settles.
+- `AvoidingCapsule.syncBandItems()` owns band-local gap impulse offsets for
+  each module. Static row spacing stays equal to `BarState.moduleGap`, so
+  avoidance geometry does not drift while moving.
 - `ModuleHost` wraps every loaded module in `ModuleHover`. The manifest can set
   `hover` to `lift`, `jelly`, `glow`, or `none`; missing values use `lift`.
 - Hover animation is intentionally separate from avoidance animation. Hover
@@ -110,19 +109,23 @@ ways.
 
 ## Capsules
 
-`ModuleHost` draws separate capsules for non-empty left, center, and right
-sections. Capsule surfaces use `Theme.surfaceContainer` and
-`Theme.surfaceContainerHigh`, which are populated from caelestia's generated M3
-scheme when available. The outer `panel` is transparent and only provides the
-neutral coordinate space.
+`ModuleHost` groups modules into left, center, and right avoidance bands.
+`ModuleHover` draws each module's own capsule surface, so `BarState.moduleGap`
+creates transparent space between neighboring modules. The outer `panel` is
+transparent and only provides the neutral coordinate space.
 
 The content width keeps the center section visually centered by reserving equal
 space for the wider side:
 
-- `leftCapsuleWidth`, `centerCapsuleWidth`, `rightCapsuleWidth` include section
-  padding.
+- `leftCapsuleWidth`, `centerCapsuleWidth`, `rightCapsuleWidth` come from the
+  module row widths.
 - `sideWidth` is the max of left and right capsule widths.
+- `leftAvoidanceWidth` and `rightAvoidanceWidth` are the widths needed after
+  stacking bands on either side of the launcher.
+- `avoidanceSideWidth` is the wider avoided side stack.
 - `centerBandWidth` is center plus symmetric side reservation.
+- `BarState.moduleGap` is the single core gap used between modules and in
+  section width reservation.
 - `contentWidth` is the max of center-band width and side-only width.
 
 If a module root is an `Item`, it must set real `width` and `height`, not only

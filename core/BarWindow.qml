@@ -29,7 +29,7 @@ PanelWindow {
     // 贴近屏幕底部，避开 Hyprland gaps。
     margins.bottom: 3
 
-    readonly property int capsuleHeight: 32
+    readonly property real capsuleHeight: BarState.moduleHeight
     property bool completed: false
 
     implicitHeight: capsuleHeight
@@ -69,7 +69,7 @@ PanelWindow {
         Binding {
             target: BarState
             property: "avoidanceWidth"
-            value: panel.width
+            value: host.avoidanceSideWidth
         }
 
         Binding {

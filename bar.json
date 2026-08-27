@@ -1,6 +1,10 @@
 {
   "modules": [
+    { "name": "notifications", "align": "left" },
+    { "name": "clock", "align": "left", "options": { "timeFormat": "HH:mm", "dateFormat": "ddd d" } },
+    { "name": "clock", "align": "center", "options": { "timeFormat": "HH:mm:ss", "dateFormat": "ddd d" } },
+    { "name": "notifications", "align": "center" },
     { "name": "notifications", "align": "right" },
-    { "name": "clock", "align": "center" }
+    { "name": "clock", "align": "right", "options": { "timeFormat": "HH:mm", "dateFormat": "MMM d" } }
   ]
 }
