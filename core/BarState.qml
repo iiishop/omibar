@@ -28,6 +28,21 @@ QtObject {
     property bool notificationDnd: false
     property bool notificationStateReady: false
 
+    property bool mediaAvailable: false
+    property bool mediaPlaying: false
+    property string mediaTitle: ""
+    property string mediaArtist: ""
+    property string mediaAlbum: ""
+    property real mediaPosition: 0
+    property real mediaLength: 0
+    property bool mediaLyricsLoading: false
+    property bool mediaLyricsAvailable: false
+    property string mediaLyric: ""
+    property var mediaSpectrum: []
+    readonly property real mediaProgress: mediaLength > 0
+        ? Math.max(0, Math.min(1, mediaPosition / mediaLength))
+        : 0
+
     property real avoidanceWidth: 0
     readonly property real moduleHeight: 32
     readonly property real moduleGap: 10

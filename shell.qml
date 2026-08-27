@@ -10,6 +10,7 @@ ShellRoot {
 
     readonly property var hyprEvents: Core.HyprEvents
     readonly property var caelestiaBridge: Core.CaelestiaBridge
+    readonly property var mediaController: Core.MediaController
 
     IpcHandler {
         target: "omibar"
