@@ -17,10 +17,13 @@ QtObject {
         && BarState.mediaPlaying
         && !BarState.mediaLyricsAvailable
     readonly property string cavaCommand: "printf '%s\\n' '[general]' 'bars = 18' '[output]' 'method = raw' 'raw_target = /dev/stdout' 'data_format = ascii' 'ascii_max_range = 1000' > /tmp/omibar-cava.conf && exec cava -p /tmp/omibar-cava.conf"
+    readonly property real lyricLeadSeconds: 0.38
 
     property string trackKey: ""
     property string lyricRequestKey: ""
     property string lyricOutput: ""
+    property real positionAnchor: 0
+    property real positionAnchorMs: 0
     property var lyricEntries: []
 
     function textValue(value): string {
@@ -50,6 +53,8 @@ QtObject {
         if (player === null) {
             trackKey = "";
             lyricEntries = [];
+            positionAnchor = 0;
+            positionAnchorMs = 0;
             BarState.mediaAvailable = false;
             BarState.mediaPlaying = false;
             BarState.mediaTitle = "";
@@ -70,13 +75,36 @@ QtObject {
         BarState.mediaArtist = textValue(player.trackArtist);
         BarState.mediaAlbum = textValue(player.trackAlbum);
         BarState.mediaLength = secondsValue(player.length);
-        BarState.mediaPosition = secondsValue(player.position);
+        syncPosition(player);
 
         const nextKey = currentKey(player);
         if (nextKey !== trackKey) {
             trackKey = nextKey;
             fetchLyrics(player);
         }
+        updateLyric();
+    }
+
+    function syncPosition(player: MprisPlayer): void {
+        positionAnchor = secondsValue(player.position);
+        positionAnchorMs = Date.now();
+        BarState.mediaPosition = projectedPosition();
+    }
+
+    function projectedPosition(): real {
+        if (active === null)
+            return 0;
+
+        const elapsed = BarState.mediaPlaying
+            ? Math.max(0, (Date.now() - positionAnchorMs) / 1000) : 0;
+        const projected = positionAnchor + elapsed;
+        return BarState.mediaLength > 0
+            ? Math.min(BarState.mediaLength, projected)
+            : projected;
+    }
+
+    function refreshPosition(): void {
+        BarState.mediaPosition = projectedPosition();
         updateLyric();
     }
 
@@ -160,7 +188,7 @@ QtObject {
             return;
         }
 
-        const position = BarState.mediaPosition + 0.12;
+        const position = BarState.mediaPosition + lyricLeadSeconds;
         let current = lyricEntries[0];
         for (const entry of lyricEntries) {
             if (entry.time > position)
@@ -204,8 +232,10 @@ QtObject {
         function onTrackAlbumChanged(): void { root.refreshPlayer(); }
         function onLengthChanged(): void { root.refreshPlayer(); }
         function onPositionChanged(): void {
-            BarState.mediaPosition = root.secondsValue(root.active.position);
-            root.updateLyric();
+            if (root.active !== null) {
+                root.syncPosition(root.active);
+                root.updateLyric();
+            }
         }
     }
 
@@ -213,10 +243,7 @@ QtObject {
         interval: 300
         running: root.active !== null
         repeat: true
-        onTriggered: {
-            BarState.mediaPosition = root.secondsValue(root.active.position);
-            root.updateLyric();
-        }
+        onTriggered: root.refreshPosition()
     }
 
     readonly property Process lyricsProc: Process {

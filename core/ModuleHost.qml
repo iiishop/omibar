@@ -25,27 +25,37 @@ Item {
     readonly property real leftCapsuleWidth: capsuleWidthFor(leftCapsule.moduleRow)
     readonly property real centerCapsuleWidth: capsuleWidthFor(centerCapsule.moduleRow)
     readonly property real rightCapsuleWidth: capsuleWidthFor(rightCapsule.moduleRow)
-    readonly property real sideWidth: Math.max(leftCapsuleWidth, rightCapsuleWidth)
+    readonly property real leftCenterGap: leftCapsuleWidth > 0 && centerCapsuleWidth > 0
+        ? moduleGap : 0
+    readonly property real centerRightGap: centerCapsuleWidth > 0 && rightCapsuleWidth > 0
+        ? moduleGap : 0
+    readonly property real sideGap: leftCapsuleWidth > 0 && rightCapsuleWidth > 0
+        ? moduleGap : 0
+    readonly property real leftExtent: leftCapsuleWidth + leftCenterGap
+    readonly property real rightExtent: rightCapsuleWidth + centerRightGap
+    readonly property real sideExtent: Math.max(leftExtent, rightExtent)
     readonly property real leftAvoidanceWidth: leftCapsuleWidth + centerCapsuleWidth
-        + (leftCapsuleWidth > 0 && centerCapsuleWidth > 0 ? moduleGap : 0)
+        + leftCenterGap
     readonly property real rightAvoidanceWidth: rightCapsuleWidth
     readonly property real avoidanceSideWidth: Math.max(leftAvoidanceWidth, rightAvoidanceWidth)
-    readonly property real centerBandWidth: centerCapsuleWidth
-        + (sideWidth > 0 ? (sideWidth + moduleGap) * 2 : 0)
-    readonly property real sideBandWidth: leftCapsuleWidth + rightCapsuleWidth
-        + (leftCapsuleWidth > 0 && rightCapsuleWidth > 0 ? moduleGap : 0)
+    readonly property real centerBandWidth: centerCapsuleWidth + sideExtent * 2
+    readonly property real sideBandWidth: leftCapsuleWidth + rightCapsuleWidth + sideGap
 
-    // 内容总宽度：中区要保持视觉居中，因此左右按较宽侧对称预留。
+    // 内容总宽度保留对称留白；左右 band 的实际 x 贴着 center，而不是贴边。
     // 不用 childrenRect（会与 anchors.fill 形成循环依赖）。
     readonly property real contentWidth: Math.max(centerBandWidth, sideBandWidth)
     readonly property real centerCapsuleX: (width - centerCapsuleWidth) / 2
-    readonly property real rightCapsuleX: width - rightCapsuleWidth
+    readonly property real leftCapsuleX: centerCapsuleWidth > 0
+        ? centerCapsuleX - leftCenterGap - leftCapsuleWidth : 0
+    readonly property real rightCapsuleX: centerCapsuleWidth > 0
+        ? centerCapsuleX + centerCapsuleWidth + centerRightGap
+        : width - rightCapsuleWidth
 
     // 三区水平排布：每个非空区都是独立胶囊。
     AvoidingCapsule {
         id: leftCapsule
 
-        neutralX: 0
+        neutralX: root.leftCapsuleX
         neutralScreenX: root.neutralScreenX
         movementOriginX: root.movementOriginX
         capsuleWidth: root.leftCapsuleWidth

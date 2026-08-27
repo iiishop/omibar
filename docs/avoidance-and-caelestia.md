@@ -117,11 +117,18 @@ creates transparent space between neighboring modules. The outer `panel` is
 transparent and only provides the neutral coordinate space.
 
 The content width keeps the center section visually centered by reserving equal
-space for the wider side:
+space for the wider side, but left and right bands are positioned against the
+center band instead of against the outer host edges. Extra width from a wider
+side is invisible slack; it must not become a larger gap between center and the
+opposite side.
 
 - `leftCapsuleWidth`, `centerCapsuleWidth`, `rightCapsuleWidth` come from the
   module row widths.
-- `sideWidth` is the max of left and right capsule widths.
+- `leftCenterGap` and `centerRightGap` are the actual gaps next to the center
+  band.
+- `leftExtent` and `rightExtent` are each side's width plus its center gap.
+- `sideExtent` is the max of those extents and exists only for symmetric center
+  reservation.
 - `leftAvoidanceWidth` and `rightAvoidanceWidth` are the widths needed after
   stacking bands on either side of the launcher.
 - `avoidanceSideWidth` is the wider avoided side stack.
