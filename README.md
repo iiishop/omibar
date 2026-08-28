@@ -1,25 +1,94 @@
-# omibar
+<h1 align="center">omibar</h1>
 
-插件式 Quickshell 底部 bar，为 Hyprland 环境设计。
+<p align="center">A plugin-based Quickshell bottom bar for Hyprland.</p>
 
-caelestia-shell 是可选集成：存在时，omibar 可读取它的公开 IPC 和配色文件；不存在时，omibar 继续按 Hyprland bar 运行。
+<p align="center">
+  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">简体中文</a>
+</p>
 
-## 架构
+<p align="center">
+  <img src="https://img.shields.io/github/stars/iiishop/omibar?style=flat-square" alt="GitHub stars">
+  <a href="https://github.com/iiishop/omibar/releases"><img src="https://img.shields.io/github/v/release/iiishop/omibar?style=flat-square" alt="Release"></a>
+</p>
 
-- **core/** — 框架层。BarState（统一状态机）、HyprEvents（Hyprland 事件入口）、CaelestiaBridge（可选 caelestia IPC 查询器）、ModuleHost（模块装载器）、Theme（内置主题 + 可选 scheme.json 同步）。
-- **modules/** — 插件区，一个模块一个文件夹，入口 `Module.qml`，元信息 `module.json`。
-- **bar.json** — 模块清单，唯一事实来源：列出装载哪些模块及对齐位置。
+omibar is a modular status bar for Hyprland, built on Quickshell. Modules are loaded from a manifest, placed into left/right bands, and share a unified state machine, theme, and hover system. [caelestia-shell](https://github.com/caelestia-dots/shell) integration is optional: when present, omibar reads its IPC and color scheme; when absent, omibar runs standalone.
 
-## 模块契约
+## Highlights
 
-每个模块提供 `modules/<name>/Module.qml`（内容渲染）+ `module.json`（声明 name / align / description）。动画、间距、hover 由 ModuleHost 统一施加，模块不写自己的进出场动画。`bar.json` entries may set `hover` (`lift`, `jelly`, `glow`, `none`) per module.
+| Highlight | Why it matters |
+|---|---|
+| Manifest-driven modules | `bar.json` is the single source of truth for which modules load and where they sit |
+| Dynamic island avoidance | Capsules smoothly yield when the launcher or a fullscreen window appears, with springy jelly deformation |
+| Per-module hover effects | Choose `lift`, `jelly`, `glow`, or `none` per module from the manifest |
+| Optional caelestia integration | Auto-syncs color scheme and drawer state; degrades gracefully when caelestia is not running |
+| Material 3 theming | Full semantic color slots that follow the active theme or a caelestia `scheme.json` |
 
-## 运行
+## Architecture
 
-```sh
-qs -c omibar -p ~/Projects/omibar
+```text
+┌──────────┐   bar.json   ┌─────────────────┐
+│ modules/ │─────────────▶│   ModuleHost    │
+│  media   │  loads into  │  (loader +      │
+│  clock   │  bands       │   layout)       │
+│ updates  │              └───┬─────┬───────┘
+│ notif.   │                  │     │
+└──────────┘          ┌───────▼─┐ ┌─▼────────┐
+                      │BarState │ │  Theme   │
+                      │ state   │ │colors/font│
+                      └────┬────┘ └────┬─────┘
+                           │           │
+                  ┌────────▼───┐  ┌────▼────────┐
+                  │HyprEvents  │  │Caelestia    │
+                  │Hyprland IPC│  │Bridge (opt.)│
+                  └────────────┘  └─────────────┘
 ```
 
-## 状态
+## Quick Install
 
-早期骨架阶段，模块清单待扩充。
+Requires [Hyprland](https://hyprland.org) and Quickshell 0.3+ (AUR: `quickshell-git`).
+
+```sh
+git clone https://github.com/iiishop/omibar
+cd omibar
+```
+
+## Quick Start
+
+Launch the bar with Quickshell:
+
+```sh
+qs -c omibar -p .
+```
+
+You should see the bottom bar appear with the media and clock capsules on the left, updates and notifications on the right. Hover a capsule to see its configured effect; open the launcher to watch the bar yield.
+
+## Configuration
+
+### Module manifest
+
+`bar.json` lists which modules load and their band position:
+
+```json
+{
+  "modules": [
+    { "name": "media", "band": "left" },
+    { "name": "clock", "band": "left" },
+    { "name": "updates", "band": "right" },
+    { "name": "notifications", "band": "right" }
+  ]
+}
+```
+
+### Module contract
+
+Each module ships `modules/<name>/Module.qml` (content) plus `module.json` (name / align / description). Animation, spacing, and hover are applied uniformly by `ModuleHost`; modules do not write their own entry/exit animations. A module entry may set `hover` (`lift`, `jelly`, `glow`, `none`).
+
+## Documentation
+
+| Topic | What it covers | Link |
+|---|---|---|
+| Avoidance & caelestia | Capsule avoidance animation rules and caelestia IPC integration | [Open documentation](./docs/avoidance-and-caelestia.md) |
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=iiishop%2Fomibar&type=Date)](https://star-history.com/#iiishop/omibar&Date)
