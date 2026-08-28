@@ -11,20 +11,35 @@ Item {
     required property BarState barState
 
     readonly property int iconSize: 18
-    readonly property int timeSize: 15
     readonly property int dateSize: 10
     readonly property int horizontalGap: 8
-    readonly property int verticalGap: -2
-    readonly property string timeText: Qt.formatDateTime(now, "HH:mm")
     readonly property string dateText: Qt.formatDate(now, qsTr("yyyy年MM月dd日"))
     readonly property bool calendarActive: moduleHover.hovered || calendarHover.hovered
     property date now: new Date()
     property bool calendarOpen: false
+    property bool calendarVisible: false
 
     implicitWidth: layout.implicitWidth
     implicitHeight: layout.implicitHeight
     width: implicitWidth
     height: implicitHeight
+
+    function showCalendar(): void {
+        hideCalendar.stop();
+        closeCalendar.stop();
+        calendarPopup.anchor.updateAnchor();
+        if (calendarVisible) {
+            calendarOpen = true;
+            return;
+        }
+
+        calendarOpen = false;
+        calendarVisible = true;
+        Qt.callLater(() => {
+            if (root.calendarVisible && root.calendarActive)
+                root.calendarOpen = true;
+        });
+    }
 
     Row {
         id: layout
@@ -44,16 +59,6 @@ Item {
 
         Column {
             anchors.verticalCenter: parent.verticalCenter
-            spacing: root.verticalGap
-
-            Text {
-                text: root.timeText
-                color: Theme.fg
-                renderType: Text.NativeRendering
-                font.family: Theme.bodyFont
-                font.pixelSize: root.timeSize
-                font.weight: Font.Medium
-            }
 
             Text {
                 text: root.dateText
@@ -71,9 +76,7 @@ Item {
 
         onHoveredChanged: {
             if (hovered) {
-                hideCalendar.stop();
-                root.calendarOpen = true;
-                calendarPopup.anchor.updateAnchor();
+                root.showCalendar();
             } else {
                 hideCalendar.restart();
             }
@@ -85,8 +88,20 @@ Item {
 
         interval: 140
         onTriggered: {
-            if (!root.calendarActive)
+            if (!root.calendarActive) {
                 root.calendarOpen = false;
+                closeCalendar.restart();
+            }
+        }
+    }
+
+    Timer {
+        id: closeCalendar
+
+        interval: 240
+        onTriggered: {
+            if (!root.calendarActive && !root.calendarOpen)
+                root.calendarVisible = false;
         }
     }
 
@@ -100,43 +115,32 @@ Item {
     PopupWindow {
         id: calendarPopup
 
-        width: calendar.width
-        height: calendar.height
-        visible: root.calendarOpen
+        implicitWidth: calendar.width
+        implicitHeight: calendar.height
+        visible: root.calendarVisible
         color: "transparent"
 
         anchor.item: root
         anchor.edges: Edges.Top
         anchor.gravity: Edges.Top
-        anchor.margins.top: 10
+        anchor.margins.top: 18
 
         MonthCalendar {
             id: calendar
 
             now: root.now
-            opacity: root.calendarOpen ? 1 : 0
-            scale: root.calendarOpen ? 1 : 0.96
-            transformOrigin: Item.Bottom
+            open: root.calendarOpen
 
             HoverHandler {
                 id: calendarHover
 
                 onHoveredChanged: {
                     if (hovered) {
-                        hideCalendar.stop();
-                        root.calendarOpen = true;
+                        root.showCalendar();
                     } else {
                         hideCalendar.restart();
                     }
                 }
-            }
-
-            Behavior on opacity {
-                OpacityAnimator { duration: 150; easing.type: Easing.OutCubic }
-            }
-
-            Behavior on scale {
-                NumberAnimation { duration: 180; easing.type: Easing.OutBack }
             }
         }
     }

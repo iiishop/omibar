@@ -14,7 +14,7 @@ its optional caelestia integration.
 - `core/ModuleHost.qml` owns module placement and per-section avoidance bands.
 - `core/AvoidingCapsule.qml` owns per-band launcher avoidance and inertial lag.
 - `core/JellyMotion.qml` owns reusable squash, recoil, and inertial lag motion.
-- `core/ModuleHover.qml` owns per-module hover hit targets and visual shells.
+- `core/ModuleHost.qml` owns per-module static visual shells.
 - `core/HoverMotion.qml` owns reusable hover response presets. It is separate
   from `JellyMotion`, which remains dedicated to travel/avoidance motion.
 
@@ -92,18 +92,23 @@ Avoidance animation stays inside the bar internals:
 - `AvoidingCapsule.Behavior on width` smooths band width changes.
 - `BarWindow.Behavior on y` smooths fullscreen vertical avoidance.
 - `JellyMotion` gives the module row a 14 px inertial lag opposite the current
-  travel direction, then returns it to zero. No decorative trail or persistent
-  effect remains after avoidance settles.
+  travel direction, then returns it to zero. The row itself is not scaled:
+  capsule surfaces must not stretch during avoidance.
 - `AvoidingCapsule` treats movement as a band-local gap wave. Each gap gets a
   phase delay from its neutral distance to `movementOriginX`, then its larger
   compression/recoil delta contributes visual offsets to the modules on either
   side. Static row spacing stays equal to `BarState.moduleGap`, so movement
-  geometry does not drift while moving.
-- `ModuleHost` wraps every loaded module in `ModuleHover`. The manifest can set
-  `hover` to `lift`, `jelly`, `glow`, or `none`; missing values use `lift`.
-- Hover animation is intentionally separate from avoidance animation. Hover
-  changes module content scale/y and a small local surface opacity only; it does
-  not change capsule x, width, or launcher avoidance state.
+  geometry does not drift while moving. The visual compression may reduce a gap
+  down to `AvoidingCapsule.minimumMotionGap` during the impulse; the current
+  value is 1 px for a deliberately strong jelly effect.
+- `AvoidingCapsule.bandItems` is the explicit band API for modules affected by
+  the gap wave. `ModuleHost` registers each module shell; avoidance must not
+  infer movable modules from arbitrary `row.children`.
+- `ModuleHost` wraps every loaded module in a static shell. It does not
+  read hover settings from the manifest and does not apply hover animation.
+- `HoverMotion` is only a reusable library. A module that wants hover motion
+  must instantiate it inside its own `Module.qml`, so hover behavior stays owned
+  by the module instead of the host.
 
 Do not animate `PanelWindow.visible` or move the `PanelWindow` itself. Layer-shell
 animations and compositor layer transitions can otherwise combine in surprising
@@ -112,7 +117,7 @@ ways.
 ## Capsules
 
 `ModuleHost` groups modules into left, center, and right avoidance bands.
-`ModuleHover` draws each module's own capsule surface, so `BarState.moduleGap`
+`ModuleHost` draws each module's own capsule surface, so `BarState.moduleGap`
 creates transparent space between neighboring modules. The outer `panel` is
 transparent and only provides the neutral coordinate space.
 

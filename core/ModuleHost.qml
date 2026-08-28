@@ -19,12 +19,47 @@ Item {
     property var manifest: []   // [{name, align, options}]
     // 组件缓存按模块名共享；同一模块出现多次时只编译一份，实例各自独立。
     property var componentCache: ({})
-    property Component hoverComponent: Component { ModuleHover {} }
+    property Component shellComponent: Component {
+        Item {
+            id: shell
+
+            readonly property real hPadding: 16
+            property real gapImpulseOffset: 0
+            property alias contentParent: contentSlot
+
+            implicitWidth: contentSlot.childrenRect.width + hPadding * 2
+            implicitHeight: BarState.moduleHeight
+            width: implicitWidth
+            height: implicitHeight
+
+            transform: Translate {
+                x: shell.gapImpulseOffset
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                color: Theme.surfaceContainerHigh
+            }
+
+            Item {
+                id: contentSlot
+
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: (parent.height - height) / 2
+                width: childrenRect.width
+                height: childrenRect.height
+            }
+        }
+    }
     readonly property real moduleGap: BarState.moduleGap
 
-    readonly property real leftCapsuleWidth: capsuleWidthFor(leftCapsule.moduleRow)
-    readonly property real centerCapsuleWidth: capsuleWidthFor(centerCapsule.moduleRow)
-    readonly property real rightCapsuleWidth: capsuleWidthFor(rightCapsule.moduleRow)
+    readonly property real leftCapsuleWidth: leftCapsule.moduleRow
+        ? leftCapsule.moduleRow.implicitWidth : 0
+    readonly property real centerCapsuleWidth: centerCapsule.moduleRow
+        ? centerCapsule.moduleRow.implicitWidth : 0
+    readonly property real rightCapsuleWidth: rightCapsule.moduleRow
+        ? rightCapsule.moduleRow.implicitWidth : 0
     readonly property real leftCenterGap: leftCapsuleWidth > 0 && centerCapsuleWidth > 0
         ? moduleGap : 0
     readonly property real centerRightGap: centerCapsuleWidth > 0 && rightCapsuleWidth > 0
@@ -96,30 +131,33 @@ Item {
 
     // 清单变化时全量重建；模块数量少，重建比增量 diff 更简单可靠。
     function rebuild(): void {
-        for (const row of [leftCapsule.moduleRow, centerCapsule.moduleRow,
-                           rightCapsule.moduleRow]) {
+        for (const capsule of [leftCapsule, centerCapsule, rightCapsule]) {
+            const row = capsule.moduleRow;
             for (let i = row.children.length - 1; i >= 0; --i)
                 row.children[i].destroy();
+            capsule.clearBandItems();
         }
         for (const entry of manifest) {
             const component = getComponent(entry.name);
             if (!component || component.status === Component.Error) {
-                console.warn("[omibar] skip module:", entry.name);
+                console.warn("[omibar] skip module:", entry.name,
+                             component ? component.errorString() : "missing component");
                 continue;
             }
-            const wrapper = hoverComponent.createObject(
-                rowFor(entry.align), { hoverPreset: hoverPresetFor(entry) });
-            if (!wrapper) {
-                console.warn("[omibar] create hover wrapper failed:", entry.name);
+            const capsule = capsuleFor(entry.align);
+            const shell = shellComponent.createObject(capsule.moduleRow);
+            if (!shell) {
+                console.warn("[omibar] create module shell failed:", entry.name);
                 continue;
             }
             const instance = component.createObject(
-                wrapper.contentParent, { barState: BarState });
+                shell.contentParent, { barState: BarState });
             if (!instance) {
                 console.warn("[omibar] create failed:", entry.name);
-                wrapper.destroy();
+                shell.destroy();
                 continue;
             }
+            capsule.registerBandItem(shell);
             const options = entry.options ?? {};
             for (const key in options)
                 instance[key] = options[key];
@@ -136,19 +174,10 @@ Item {
         return componentCache[name];
     }
 
-    function rowFor(align): Item {
-        if (align === "center") return centerCapsule.moduleRow;
-        if (align === "right") return rightCapsule.moduleRow;
-        return leftCapsule.moduleRow;
-    }
-
-    function hoverPresetFor(entry): string {
-        const preset = entry.hover ?? entry.hoverAnimation ?? "lift";
-        return typeof preset === "string" ? preset : "lift";
-    }
-
-    function capsuleWidthFor(row): real {
-        return row.implicitWidth;
+    function capsuleFor(align) {
+        if (align === "center") return centerCapsule;
+        if (align === "right") return rightCapsule;
+        return leftCapsule;
     }
 
     // ---- 清单加载 ----

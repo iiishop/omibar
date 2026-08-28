@@ -1,6 +1,7 @@
 {
   "modules": [
     { "name": "media", "align": "left" },
+    { "name": "updates", "align": "right" },
     { "name": "notifications", "align": "right" },
     { "name": "clock", "align": "center" }
   ]

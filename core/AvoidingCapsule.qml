@@ -31,16 +31,18 @@ Item {
     readonly property real jellyLag: 14
     readonly property real contentLagRatio: 0.65
     readonly property real lagTarget: -motionDirection * jellyLag
-    readonly property real gapCompression: Math.min(6, moduleGap * 0.6)
-    readonly property real gapRecoil: Math.min(3, moduleGap * 0.3)
-    readonly property real gapWaveDelayPx: 700
-    readonly property real gapWaveMaxDelay: 0.44
+    readonly property real minimumMotionGap: 1
+    readonly property real gapCompression: Math.max(0, moduleGap - minimumMotionGap)
+    readonly property real gapRecoil: Math.min(6, moduleGap * 0.55)
+    readonly property real gapWaveDelayPx: 520
+    readonly property real gapWaveMaxDelay: 0.36
     readonly property int travelDuration: BarState.launcherOpen ? 280 : 190
 
     property real deformX: 1.0
     property real deformY: 1.0
     property real bodyLag: 0.0
     property real gapWaveProgress: 0.0
+    property var bandItems: []
 
     visible: width > 0
     x: neutralX + yieldOffset
@@ -57,14 +59,25 @@ Item {
         applyGapWave();
     }
 
+    function clearBandItems(): void {
+        bandItems = [];
+    }
+
+    function registerBandItem(item): void {
+        const nextItems = bandItems.slice();
+        nextItems.push(item);
+        bandItems = nextItems;
+        applyGapWave();
+    }
+
     function applyGapWave(): void {
-        for (let i = 0; i < row.children.length; ++i)
-            row.children[i].gapImpulseOffset = itemImpulseOffset(i);
+        for (let i = 0; i < bandItems.length; ++i)
+            bandItems[i].gapImpulseOffset = itemImpulseOffset(i);
     }
 
     function itemImpulseOffset(itemIndex: int): real {
         let offset = 0;
-        for (let gapIndex = 0; gapIndex < row.children.length - 1; ++gapIndex) {
+        for (let gapIndex = 0; gapIndex < bandItems.length - 1; ++gapIndex) {
             const delta = gapDelta(gapIndex);
             offset += itemIndex <= gapIndex ? -delta / 2 : delta / 2;
         }
@@ -85,7 +98,7 @@ Item {
     }
 
     function gapDelay(gapIndex: int): real {
-        const leftItem = row.children[gapIndex];
+        const leftItem = bandItems[gapIndex];
         const gapCenterX = neutralScreenX + neutralX + row.x + leftItem.x
             + leftItem.width + moduleGap / 2;
         const distance = Math.abs(gapCenterX - movementOriginX);
@@ -129,17 +142,17 @@ Item {
 
         target: root
         lagTarget: root.lagTarget
-        stretchX: 1.12
-        stretchY: 0.9
-        recoilX: 0.96
-        recoilY: 1.06
-        settleSpring: 4.8
-        settleDamping: 0.3
+        stretchX: 1.0
+        stretchY: 1.0
+        recoilX: 1.0
+        recoilY: 1.0
+        settleSpring: 5.2
+        settleDamping: 0.26
         settleMass: 0.72
-        stretchDuration: 95
-        recoilDuration: 150
-        lagDuration: 90
-        settleDuration: 220
+        stretchDuration: 105
+        recoilDuration: 170
+        lagDuration: 105
+        settleDuration: 260
     }
 
     NumberAnimation {
@@ -149,7 +162,7 @@ Item {
         property: "gapWaveProgress"
         from: 0.0
         to: 1.0 + root.gapWaveMaxDelay
-        duration: 580
+        duration: 640
         easing.type: Easing.Linear
 
         onStopped: {
