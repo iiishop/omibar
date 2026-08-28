@@ -87,6 +87,3 @@ qs -c omibar -p .
 |---|---|---|
 | 避让与 caelestia | 胶囊避让动画规则与 caelestia IPC 集成 | [打开文档](./docs/avoidance-and-caelestia.md) |
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=iiishop%2Fomibar&type=Date&v=2)](https://star-history.com/#iiishop/omibar&Date)

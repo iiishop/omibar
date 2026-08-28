@@ -89,6 +89,3 @@ Each module ships `modules/<name>/Module.qml` (content) plus `module.json` (name
 |---|---|---|
 | Avoidance & caelestia | Capsule avoidance animation rules and caelestia IPC integration | [Open documentation](./docs/avoidance-and-caelestia.md) |
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=iiishop%2Fomibar&type=Date&v=2)](https://star-history.com/#iiishop/omibar&Date)
