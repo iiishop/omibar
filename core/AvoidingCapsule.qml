@@ -9,6 +9,7 @@ Item {
     required property real neutralX
     required property real neutralScreenX
     required property real movementOriginX
+    required property real movementDirection
     required property real capsuleWidth
     required property real moduleGap
     required property real leftStackOffset
@@ -18,7 +19,7 @@ Item {
     readonly property real leftX: neutralScreenX + neutralX
     readonly property real rightX: leftX + width
     readonly property real centerX: neutralScreenX + neutralX + width / 2
-    readonly property real yieldDirection: centerX <= BarState.launcherCenterX ? -1 : 1
+    readonly property real yieldDirection: movementDirection
     readonly property real leftYieldOffset: BarState.launcherLeft
         - BarState.launcherPadding - leftStackOffset - rightX
     readonly property real rightYieldOffset: BarState.launcherRight

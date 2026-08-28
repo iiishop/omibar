@@ -74,14 +74,12 @@ The shift is derived in `BarState`:
   side stack, so the `PanelWindow` remains wide enough for either side
   movement.
 
-Each `AvoidingCapsule` derives its own neutral screen center from
-`ModuleHost.neutralScreenX + neutralX + width / 2`. When `launcherOpen` is true,
-the capsule moves left if its neutral center is at or left of launcher center,
-and right otherwise. The final position is edge based: a left-moving capsule
-places its right edge at `launcherLeft - launcherPadding`, and a right-moving
-capsule places its left edge at `launcherRight + launcherPadding`. When
-`launcherOpen` becomes false, the same binding returns that capsule to its
-neutral x position.
+Each `AvoidingCapsule` receives an explicit `movementDirection` from
+`ModuleHost`: left band is `-1`, right band is `1`. When `launcherOpen` is true,
+the final position is edge based: a left-moving capsule places its right edge at
+`launcherLeft - launcherPadding`, and a right-moving capsule places its left
+edge at `launcherRight + launcherPadding`. When `launcherOpen` becomes false,
+the same binding returns that capsule to its neutral x position.
 
 ## Animation
 
@@ -116,31 +114,22 @@ ways.
 
 ## Capsules
 
-`ModuleHost` groups modules into left, center, and right avoidance bands.
+`ModuleHost` groups modules into left and right avoidance bands.
 `ModuleHost` draws each module's own capsule surface, so `BarState.moduleGap`
 creates transparent space between neighboring modules. The outer `panel` is
 transparent and only provides the neutral coordinate space.
 
-The content width keeps the center section visually centered by reserving equal
-space for the wider side, but left and right bands are positioned against the
-center band instead of against the outer host edges. Extra width from a wider
-side is invisible slack; it must not become a larger gap between center and the
-opposite side.
+The content width reserves equal space for the wider side on both sides of the
+middle gap. That keeps the split between left and right bands aligned with the
+launcher center even when the two bands have different widths.
 
-- `leftCapsuleWidth`, `centerCapsuleWidth`, `rightCapsuleWidth` come from the
-  module row widths.
-- `leftCenterGap` and `centerRightGap` are the actual gaps next to the center
-  band.
-- `leftExtent` and `rightExtent` are each side's width plus its center gap.
-- `sideExtent` is the max of those extents and exists only for symmetric center
-  reservation.
-- `leftAvoidanceWidth` and `rightAvoidanceWidth` are the widths needed after
-  stacking bands on either side of the launcher.
-- `avoidanceSideWidth` is the wider avoided side stack.
-- `centerBandWidth` is center plus symmetric side reservation.
+- `bar.json` assigns each module to a motion `band`: `left` or `right`.
+- `leftCapsuleWidth` and `rightCapsuleWidth` come from the module row widths.
+- `middleGap` is the actual gap between the two motion bands.
+- `sideExtent` and `avoidanceSideWidth` are the wider avoided side stack.
 - `BarState.moduleGap` is the single core gap used between modules and in
   section width reservation.
-- `contentWidth` is the max of center-band width and side-only width.
+- `contentWidth` is `sideExtent * 2 + middleGap`.
 
 If a module root is an `Item`, it must set real `width` and `height`, not only
 `implicitWidth` and `implicitHeight`, because `Row` placement depends on actual

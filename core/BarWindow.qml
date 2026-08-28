@@ -78,7 +78,7 @@ PanelWindow {
             value: root.screenW
         }
 
-        // 模块装载：清单驱动，左中右三区。水平避让由各胶囊分别处理。
+        // 模块装载：清单驱动，左右两个避让 band。水平避让由各胶囊分别处理。
         ModuleHost {
             id: host
 

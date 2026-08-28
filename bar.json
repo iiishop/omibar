@@ -1,8 +1,8 @@
 {
   "modules": [
-    { "name": "media", "align": "left" },
-    { "name": "updates", "align": "right" },
-    { "name": "notifications", "align": "right" },
-    { "name": "clock", "align": "center" }
+    { "name": "media", "band": "left" },
+    { "name": "clock", "band": "left" },
+    { "name": "updates", "band": "right" },
+    { "name": "notifications", "band": "right" }
   ]
 }
