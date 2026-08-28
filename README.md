@@ -89,3 +89,13 @@ Each module ships `modules/<name>/Module.qml` (content) plus `module.json` (name
 |---|---|---|
 | Avoidance & caelestia | Capsule avoidance animation rules and caelestia IPC integration | [Open documentation](./docs/avoidance-and-caelestia.md) |
 
+## Star History
+
+<a href="https://www.star-history.com/?type=date&repos=iiishop%2Fomibar">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=iiishop/omibar&type=date&theme=dark&legend=top-left&sealed_token=MMCxquqAlbV9fQrbpHCinyXd73kFEZGJWo_Sw-FywlMyQxcGt40t9lAzY10jk0yXi6bc6c7xnGpnlpsWza0HAMd0NwMQiPIvYv-_P53Ebrpk2GPhvmPiCw" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=iiishop/omibar&type=date&legend=top-left&sealed_token=MMCxquqAlbV9fQrbpHCinyXd73kFEZGJWo_Sw-FywlMyQxcGt40t9lAzY10jk0yXi6bc6c7xnGpnlpsWza0HAMd0NwMQiPIvYv-_P53Ebrpk2GPhvmPiCw" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=iiishop/omibar&type=date&legend=top-left&sealed_token=MMCxquqAlbV9fQrbpHCinyXd73kFEZGJWo_Sw-FywlMyQxcGt40t9lAzY10jk0yXi6bc6c7xnGpnlpsWza0HAMd0NwMQiPIvYv-_P53Ebrpk2GPhvmPiCw" />
+ </picture>
+</a>
+
