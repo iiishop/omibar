@@ -98,7 +98,7 @@ Item {
     Timer {
         id: closeCalendar
 
-        interval: 240
+        interval: calendar.exitDuration
         onTriggered: {
             if (!root.calendarActive && !root.calendarOpen)
                 root.calendarVisible = false;

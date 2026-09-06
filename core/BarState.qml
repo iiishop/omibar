@@ -45,6 +45,31 @@ QtObject {
         ? Math.max(0, Math.min(1, mediaPosition / mediaLength))
         : 0
 
+    component UpdateSource: QtObject {
+        property string status: "unchecked"
+        // Count belongs to lastSuccess, including while a later attempt fails.
+        property int count: -1
+        property double lastAttempt: 0
+        property double lastSuccess: 0
+        property string error: ""
+        property string diagnostic: ""
+    }
+
+    readonly property QtObject updateRepo: UpdateSource {}
+    readonly property QtObject updateAur: UpdateSource {}
+    readonly property list<QtObject> updateSources: [updateRepo, updateAur]
+    readonly property int updateTotalCount: updateSources.reduce((total, source) =>
+        total + (source.status === "success" ? source.count : 0), 0)
+    readonly property string updateState: {
+        const states = updateSources.map(source => source.status);
+        if (states.includes("checking")) return "checking";
+        if (states.includes("unchecked")) return "unchecked";
+        if (states.includes("busy")) return "busy";
+        if (states.every(state => state === "success"))
+            return updateTotalCount > 0 ? "available" : "up_to_date";
+        return states.includes("success") ? "partial_failure" : "error";
+    }
+
     property real avoidanceWidth: 0
     readonly property real moduleHeight: 32
     readonly property real moduleGap: 10

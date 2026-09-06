@@ -71,22 +71,29 @@ Item {
         applyGapWave();
     }
 
-    function applyGapWave(): void {
-        for (let i = 0; i < bandItems.length; ++i)
-            bandItems[i].gapImpulseOffset = itemImpulseOffset(i);
+    function visibleBandItems(): var {
+        return bandItems.filter(item => item.visible && item.width > 0);
     }
 
-    function itemImpulseOffset(itemIndex: int): real {
+    function applyGapWave(): void {
+        const items = visibleBandItems();
+        for (const item of bandItems)
+            item.gapImpulseOffset = 0;
+        for (let i = 0; i < items.length; ++i)
+            items[i].gapImpulseOffset = itemImpulseOffset(items, i);
+    }
+
+    function itemImpulseOffset(items: var, itemIndex: int): real {
         let offset = 0;
-        for (let gapIndex = 0; gapIndex < bandItems.length - 1; ++gapIndex) {
-            const delta = gapDelta(gapIndex);
+        for (let gapIndex = 0; gapIndex < items.length - 1; ++gapIndex) {
+            const delta = gapDelta(items, gapIndex);
             offset += itemIndex <= gapIndex ? -delta / 2 : delta / 2;
         }
         return offset;
     }
 
-    function gapDelta(gapIndex: int): real {
-        const phase = gapWaveProgress - gapDelay(gapIndex);
+    function gapDelta(items: var, gapIndex: int): real {
+        const phase = gapWaveProgress - gapDelay(items, gapIndex);
         if (phase < 0 || phase > 1)
             return 0;
         if (phase < 0.22)
@@ -98,8 +105,8 @@ Item {
         return gapRecoil * (1 - easeOutCubic((phase - 0.56) / 0.44));
     }
 
-    function gapDelay(gapIndex: int): real {
-        const leftItem = bandItems[gapIndex];
+    function gapDelay(items: var, gapIndex: int): real {
+        const leftItem = items[gapIndex];
         const gapCenterX = neutralScreenX + neutralX + row.x + leftItem.x
             + leftItem.width + moduleGap / 2;
         const distance = Math.abs(gapCenterX - movementOriginX);

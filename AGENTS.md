@@ -14,7 +14,7 @@
 ## 环境
 
 - Quickshell 0.3.0（quickshell-git, AUR）；Hyprland。
-- 测试实例：`WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 QT_QPA_PLATFORM=wayland HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl version -j | jq -r .tag) qs -c omibar -p <项目路径>`（SSH 上下文可起但无输入焦点）。
+- 测试实例：`HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl instances | awk 'NR==1{print $2; exit}') WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 QT_QPA_PLATFORM=wayland qs --daemonize -p <项目路径>`（SSH 上下文可起但无输入焦点）。注意 `-c` 与 `-p` 互斥；实例签名用 `hyprctl instances` 第一行的 instance 名，不能用 `hyprctl version -j` 的 tag。
 - 可选 caelestia IPC 探测：`qs -c caelestia ipc call drawers isOpen launcher` 返回 stdout "1"/"0"；caelestia 不在跑时命令失败，bridge 必须保持安静且不影响 bar。
 - 可选配色源：~/.local/state/caelestia/scheme.json 的 colours 字段（tonalspot 输出，snake_case 键名）；文件不存在时使用内置主题。
 

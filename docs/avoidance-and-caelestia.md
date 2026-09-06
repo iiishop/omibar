@@ -102,6 +102,8 @@ Avoidance animation stays inside the bar internals:
 - `AvoidingCapsule.bandItems` is the explicit band API for modules affected by
   the gap wave. `ModuleHost` registers each module shell; avoidance must not
   infer movable modules from arbitrary `row.children`.
+- A registered shell with zero width is ignored by the active gap wave, so
+  modules can hide by returning zero width without leaving a phantom gap.
 - `ModuleHost` wraps every loaded module in a static shell. It does not
   read hover settings from the manifest and does not apply hover animation.
 - `HoverMotion` is only a reusable library. A module that wants hover motion
@@ -130,6 +132,9 @@ launcher center even when the two bands have different widths.
 - `BarState.moduleGap` is the single core gap used between modules and in
   section width reservation.
 - `contentWidth` is `sideExtent * 2 + middleGap`.
+- The updates module keeps a visible status label even when no updates are
+  available. Its implicit width follows that label; the host owns capsule
+  sizing and includes it in the normal band geometry.
 
 If a module root is an `Item`, it must set real `width` and `height`, not only
 `implicitWidth` and `implicitHeight`, because `Row` placement depends on actual

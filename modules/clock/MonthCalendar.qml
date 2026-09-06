@@ -1,4 +1,4 @@
-// MonthCalendar - compact current-month panel for the clock module.
+// MonthCalendar - current-month panel, revealed from the clock below it.
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -10,10 +10,17 @@ Item {
     required property date now
     property bool open: false
 
-    readonly property int padding: 18
+    readonly property int enterDuration: 460
+    readonly property int exitDuration: 300
+    readonly property int padding: 20
+    readonly property int outerMargin: 12
     readonly property int cellSize: 36
-    readonly property int gridGap: 5
+    readonly property int gridGap: 4
     readonly property int gridWidth: cellSize * 7 + gridGap * 6
+    readonly property int riseDistance: 16
+    readonly property real closedWidthScale: 0.24
+    readonly property real closedHeightScale: 0.06
+    property real reveal: 0
     readonly property int firstWeekday: {
         const first = new Date(now.getFullYear(), now.getMonth(), 1);
         return (first.getDay() + 6) % 7;
@@ -26,205 +33,239 @@ Item {
         qsTr("五"), qsTr("六"), qsTr("日")
     ]
 
-    width: gridWidth + padding * 2 + 18
-    height: card.height
-    opacity: open ? 1 : 0
-    y: open ? 0 : 14
-    // 离屏渲染：动画期间只搬纹理，避免整棵树（42 格）每帧重光栅化
-    layer.enabled: true
-    layer.smooth: true
-    transform: Scale {
-        id: genieScale
-
-        origin.x: root.width / 2
-        origin.y: root.height
-        xScale: root.open ? 1 : 0.34
-        yScale: root.open ? 1 : 0.18
-
-        // caelestia expressiveDefaultSpatial 曲线：c1(0.38, 1.21) 超调 → 果冻 q 弹
-        Behavior on xScale {
-            NumberAnimation {
-                duration: 280
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: [ 0.38, 1.21, 0.22, 1, 1, 1 ]
-            }
-        }
-
-        Behavior on yScale {
-            NumberAnimation {
-                duration: 280
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: [ 0.38, 1.21, 0.22, 1, 1, 1 ]
-            }
-        }
-    }
+    width: gridWidth + padding * 2 + outerMargin * 2
+    height: card.height + outerMargin * 2
 
     function dayAt(index: int): int {
         const day = index - firstWeekday + 1;
         return day >= 1 && day <= daysInMonth ? day : 0;
     }
 
-    function monthTitle(): string {
-        return Qt.formatDate(now, qsTr("yyyy年M月"));
+    state: open ? "open" : ""
+    states: State {
+        name: "open"
+        PropertyChanges { root.reveal: 1 }
     }
-
-    Rectangle {
-        id: card
-
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: root.gridWidth + root.padding * 2
-        height: header.height + weekdayRow.height + calendarGrid.height
-            + root.padding * 2 + 16
-        radius: 22
-        color: Qt.alpha(Theme.surfaceContainer, 0.96)
-        border.width: 1
-        border.color: Qt.alpha(Theme.outlineVariant, 0.8)
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: parent.radius - 1
-            color: Qt.alpha(Theme.surfaceContainerHigh, 0.28)
-            border.width: 1
-            border.color: Qt.alpha(Theme.primary, 0.14)
+    transitions: [Transition {
+        from: ""
+        to: "open"
+        NumberAnimation {
+            property: "reveal"
+            duration: root.enterDuration
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.2, 0.85, 0.25, 1.08, 1, 1]
         }
+    }, Transition {
+        from: "open"
+        to: ""
+        NumberAnimation {
+            property: "reveal"
+            duration: root.exitDuration
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.55, 0, 0.8, 0.3, 1, 1]
+        }
+    }]
 
-        Row {
-            id: header
+    Item {
+        id: surface
 
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: root.padding
-            height: 36
-            spacing: 8
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "calendar_month"
-                color: Theme.tertiary
-                renderType: Text.NativeRendering
-                font.family: Theme.iconFont
-                font.pixelSize: 20
-                font.variableAxes: { "FILL": 1, "GRAD": -25 }
+        anchors.fill: parent
+        opacity: Math.min(1, root.reveal * 3)
+        transform: [
+            Translate { y: root.riseDistance * (1 - root.reveal) },
+            Scale {
+                origin.x: root.width / 2
+                origin.y: root.height
+                // Width unfolds first; height follows, keeping the base pinned.
+                xScale: root.closedWidthScale + (1 - root.closedWidthScale)
+                    * root.reveal * (2 - root.reveal)
+                yScale: root.closedHeightScale + (1 - root.closedHeightScale) * root.reveal
             }
+        ]
+        // Keep the hover target fixed while only the visual surface moves.
+        layer.enabled: root.reveal > 0 && root.reveal !== 1
+        layer.smooth: true
 
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.monthTitle()
-                color: Theme.fg
-                renderType: Text.NativeRendering
-                font.family: Theme.bodyFont
-                font.pixelSize: 17
-                font.weight: Font.DemiBold
-            }
+        Repeater {
+            model: 3
 
             Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 6
-                height: 6
-                radius: 3
-                color: Theme.primary
-            }
+                required property int index
 
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: Qt.formatDate(root.now, qsTr("dddd"))
-                color: Theme.fgVariant
-                renderType: Text.NativeRendering
-                font.family: Theme.bodyFont
-                font.pixelSize: 12
-                font.weight: Font.Medium
+                anchors.centerIn: card
+                anchors.verticalCenterOffset: 3
+                width: card.width + (index + 1) * 6
+                height: card.height + (index + 1) * 6
+                radius: card.radius + (index + 1) * 3
+                color: Qt.rgba(0, 0, 0, 0.035)
+                Accessible.ignored: true
             }
         }
 
-        Row {
-            id: weekdayRow
+        Rectangle {
+            id: card
 
-            anchors.top: header.bottom
-            anchors.topMargin: 8
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: root.gridGap
-
-            Repeater {
-                model: root.weekdays
-
-                Text {
-                    required property string modelData
-
-                    width: root.cellSize
-                    height: 20
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: modelData
-                    color: Theme.outline
-                    renderType: Text.NativeRendering
-                    font.family: Theme.bodyFont
-                    font.pixelSize: 11
-                    font.weight: Font.Medium
-                }
+            x: root.outerMargin
+            y: root.outerMargin
+            width: root.gridWidth + root.padding * 2
+            height: content.implicitHeight + root.padding * 2
+            radius: 24
+            gradient: Gradient {
+                GradientStop { position: 0; color: Theme.surfaceContainerHigh }
+                GradientStop { position: 1; color: Theme.surfaceContainer }
             }
-        }
+            border.width: 1
+            border.color: Qt.alpha(Theme.outline, 0.3)
 
-        Grid {
-            id: calendarGrid
+            Column {
+                id: content
 
-            anchors.top: weekdayRow.bottom
-            anchors.topMargin: 6
-            anchors.horizontalCenter: parent.horizontalCenter
-            columns: 7
-            rows: 6
-            spacing: root.gridGap
+                x: root.padding
+                y: root.padding
+                width: root.gridWidth
+                spacing: 16
 
-            Repeater {
-                model: 42
-
-                Rectangle {
-                    id: dayCell
-
-                    required property int index
-                    readonly property int day: root.dayAt(index)
-                    readonly property bool inMonth: day > 0
-                    readonly property bool isToday: inMonth && day === root.today
-                    readonly property bool isWeekend: index % 7 >= 5
-
-                    width: root.cellSize
-                    height: root.cellSize
-                    radius: 12
-                    color: isToday ? Theme.primary
-                        : inMonth && isWeekend ? Qt.alpha(Theme.tertiaryContainer, 0.18)
-                        : "transparent"
-                    border.width: isToday ? 0 : 1
-                    border.color: inMonth ? Qt.alpha(Theme.outlineVariant, 0.35)
-                        : "transparent"
+                Item {
+                    width: parent.width
+                    height: 70
 
                     Text {
-                        anchors.centerIn: parent
-                        text: dayCell.inMonth ? String(dayCell.day) : ""
-                        color: dayCell.isToday ? Theme.surface
-                            : dayCell.isWeekend ? Theme.tertiary
-                            : Theme.fg
-                        renderType: Text.NativeRendering
+                        id: dateNumber
+
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Qt.formatDate(root.now, "dd")
+                        color: Theme.primary
                         font.family: Theme.bodyFont
-                        font.pixelSize: dayCell.isToday ? 15 : 13
-                        font.weight: dayCell.isToday ? Font.DemiBold : Font.Medium
+                        font.pixelSize: 54
+                        font.weight: Font.Light
+                    }
+
+                    Column {
+                        anchors.left: dateNumber.right
+                        anchors.leftMargin: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 5
+
+                        Text {
+                            text: Qt.formatDate(root.now, qsTr("yyyy年M月"))
+                            color: Theme.fg
+                            font.family: Theme.bodyFont
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
+                        }
+
+                        Text {
+                            text: Qt.formatDate(root.now, qsTr("dddd"))
+                            color: Theme.fgVariant
+                            font.family: Theme.bodyFont
+                            font.pixelSize: 12
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.topMargin: 4
+                        width: 40
+                        height: 22
+                        radius: 11
+                        color: Qt.alpha(Theme.primary, 0.12)
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: qsTr("今日")
+                            color: Theme.primary
+                            font.family: Theme.bodyFont
+                            font.pixelSize: 10
+                            font.weight: Font.Medium
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Qt.alpha(Theme.outlineVariant, 0.65)
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 8
+
+                    Row {
+                        spacing: root.gridGap
+
+                        Repeater {
+                            model: root.weekdays
+
+                            Text {
+                                required property string modelData
+                                required property int index
+
+                                width: root.cellSize
+                                height: 20
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                text: modelData
+                                color: index % 7 >= 5 ? Theme.tertiary : Theme.fgVariant
+                                font.family: Theme.bodyFont
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
+                            }
+                        }
+                    }
+
+                    Grid {
+                        columns: 7
+                        rows: 6
+                        spacing: root.gridGap
+
+                        Repeater {
+                            model: 42
+
+                            Rectangle {
+                                id: dayCell
+
+                                required property int index
+                                readonly property int day: root.dayAt(index)
+                                readonly property bool inMonth: day > 0
+                                readonly property bool isToday: inMonth && day === root.today
+                                readonly property bool isWeekend: index % 7 >= 5
+
+                                width: root.cellSize
+                                height: root.cellSize
+                                radius: 12
+                                color: isToday ? Theme.primary
+                                    : inMonth && isWeekend ? Qt.alpha(Theme.tertiary, 0.06)
+                                    : "transparent"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: dayCell.inMonth ? String(dayCell.day) : ""
+                                    color: dayCell.isToday ? Theme.surface
+                                        : dayCell.isWeekend ? Theme.tertiary : Theme.fg
+                                    font.family: Theme.bodyFont
+                                    font.pixelSize: 13
+                                    font.weight: dayCell.isToday ? Font.Bold : Font.Normal
+                                }
+
+                                Rectangle {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 3
+                                    width: 3
+                                    height: 3
+                                    radius: 1.5
+                                    visible: dayCell.isToday
+                                    color: Theme.surface
+                                    Accessible.ignored: true
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
-
-    Behavior on opacity {
-        OpacityAnimator { duration: 180; easing.type: Easing.OutCubic }
-    }
-
-    Behavior on y {
-        NumberAnimation {
-            duration: 280
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: [ 0.38, 1.21, 0.22, 1, 1, 1 ]
-        }
-    }
-
 }

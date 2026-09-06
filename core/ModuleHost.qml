@@ -24,13 +24,15 @@ Item {
             id: shell
 
             readonly property real hPadding: 16
+            readonly property real contentWidth: contentSlot.childrenRect.width
             property real gapImpulseOffset: 0
             property alias contentParent: contentSlot
 
-            implicitWidth: contentSlot.childrenRect.width + hPadding * 2
+            implicitWidth: contentWidth > 0 ? contentWidth + hPadding * 2 : 0
             implicitHeight: BarState.moduleHeight
             width: implicitWidth
             height: implicitHeight
+            visible: width > 0
 
             transform: Translate {
                 x: shell.gapImpulseOffset

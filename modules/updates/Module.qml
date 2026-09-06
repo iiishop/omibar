@@ -1,8 +1,8 @@
-// updates module - pacman and AUR upgrade counts.
+// updates module - readable status with per-source check details.
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import Quickshell.Io
+import Quickshell
 import "../../core"
 
 Item {
@@ -10,200 +10,170 @@ Item {
 
     required property BarState barState
 
-    readonly property int iconSize: 17
-    readonly property int labelSize: 10
-    readonly property int numberSize: 14
-    readonly property int gap: 5
-    readonly property int chipWidth: 34
-    readonly property int chipHeight: 22
-    readonly property int chipRadius: 9
-    readonly property int refreshInterval: 30 * 60 * 1000
-    readonly property bool checking: pacmanProc.running || paruProc.running
-    readonly property color pacmanColor: pacmanCount > 0 ? Theme.primary : Theme.fgVariant
-    readonly property color paruColor: paruCount > 0 ? Theme.tertiary : Theme.fgVariant
-    readonly property string iconName: checking ? "sync" : (totalCount > 0
-        ? "download_for_offline" : "verified")
-    readonly property int totalCount: Math.max(0, pacmanCount) + Math.max(0, paruCount)
-
-    property int pacmanCount: -1
-    property int paruCount: -1
-    property string pacmanOutput: ""
-    property string paruOutput: ""
-    property real hoverProgress: hover.hovered ? 1 : 0
+    readonly property int iconSize: 18
+    readonly property int labelSize: 11
+    readonly property int hoverGraceMs: 220
+    readonly property bool checking: barState.updateState === "checking"
+    readonly property bool failed: barState.updateState === "error"
+        || barState.updateState === "partial_failure"
+    readonly property color accent: failed ? Theme.tertiary : Theme.primary
+    readonly property var titles: ({
+        unchecked: qsTr("尚未检查"),
+        checking: qsTr("正在检查"),
+        available: qsTr("%1 项可更新").arg(barState.updateTotalCount),
+        up_to_date: qsTr("已是最新"),
+        busy: qsTr("等待包管理器"),
+        partial_failure: qsTr("结果不完整"),
+        error: qsTr("检查失败")
+    })
+    readonly property var descriptions: ({
+        unchecked: qsTr("尚未检查官方仓库和 AUR。"),
+        checking: qsTr("正在查询官方仓库和 AUR，旧结果会单独标注。"),
+        available: qsTr("官方仓库与 AUR 均已检查，下面是各来源的结果。"),
+        up_to_date: qsTr("本次检查中，官方仓库和 AUR 均无可用更新。"),
+        busy: qsTr("包管理器数据库被占用，暂时无法检查。空闲后会自动重试。"),
+        partial_failure: barState.updateTotalCount > 0
+            ? qsTr("已确认 %1 项更新；另一个来源未完成检查，总数可能更多。")
+                .arg(barState.updateTotalCount)
+            : qsTr("一个来源检查成功，另一个未完成，暂时无法确认是否全部最新。"),
+        error: qsTr("未能取得本次检查结果，请查看各来源的原因后重试。")
+    })
+    readonly property string title: titles[barState.updateState]
+    readonly property string description: descriptions[barState.updateState]
+    readonly property string iconName: checking ? "sync"
+        : failed ? "error_outline"
+        : barState.updateState === "up_to_date" ? "check_circle"
+        : barState.updateState === "busy" ? "hourglass_top" : "system_update_alt"
+    property bool popupOpen: false
+    property bool pinned: false
 
     implicitWidth: layout.implicitWidth
-    implicitHeight: layout.implicitHeight
+    implicitHeight: 24
     width: implicitWidth
     height: implicitHeight
+    activeFocusOnTab: true
+    Accessible.role: Accessible.Button
+    Accessible.name: qsTr("系统更新：%1，打开详情").arg(title)
+    Accessible.onPressAction: toggleDetails()
+    Keys.onReturnPressed: toggleDetails()
+    Keys.onSpacePressed: toggleDetails()
+    Keys.onEscapePressed: closeDetails()
 
-    Behavior on hoverProgress {
-        NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
+    function toggleDetails(): void {
+        pinned = !pinned;
+        popupOpen = pinned;
     }
 
-    function countLines(output: string): int {
-        const text = output.trim();
-        return text === "" ? 0 : text.split("\n").length;
-    }
-
-    function refresh(): void {
-        if (!pacmanProc.running) {
-            pacmanOutput = "";
-            pacmanProc.running = true;
-        }
-        if (!paruProc.running) {
-            paruOutput = "";
-            paruProc.running = true;
-        }
+    function closeDetails(): void {
+        pinned = false;
+        popupOpen = false;
     }
 
     Row {
         id: layout
-
         anchors.centerIn: parent
-        spacing: root.gap
+        spacing: 7
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root.iconName
-            color: root.checking ? Theme.secondary
-                : (root.totalCount > 0 ? Theme.primary : Theme.fgVariant)
-            renderType: Text.NativeRendering
+            color: root.accent
             font.family: Theme.iconFont
             font.pixelSize: root.iconSize
-            font.variableAxes: { "FILL": root.totalCount > 0 || root.checking ? 1 : 0, "GRAD": -25 }
+            Accessible.ignored: true
+            RotationAnimator on rotation {
+                running: root.checking && root.visible
+                from: 0
+                to: 360
+                duration: 1100
+                loops: Animation.Infinite
+            }
         }
 
-        PackageCount {
-            label: "P"
-            count: root.pacmanCount
-            accent: root.pacmanColor
-            fill: Qt.alpha(Theme.primary, root.pacmanCount > 0 ? 0.18 : 0.07)
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: qsTr("更新 · %1").arg(root.title)
+            color: Theme.fg
+            font.family: Theme.bodyFont
+            font.pixelSize: root.labelSize
+            font.weight: Font.Medium
         }
 
-        PackageCount {
-            label: "A"
-            count: root.paruCount
-            accent: root.paruColor
-            fill: Qt.alpha(Theme.tertiary, root.paruCount > 0 ? 0.18 : 0.07)
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.popupOpen ? "expand_more" : "expand_less"
+            color: Theme.fgVariant
+            font.family: Theme.iconFont
+            font.pixelSize: 14
+            Accessible.ignored: true
         }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: -3
+        radius: 6
+        color: "transparent"
+        border.width: root.activeFocus ? 1 : 0
+        border.color: Theme.primary
     }
 
     HoverHandler {
         id: hover
+        onHoveredChanged: {
+            if (hovered) {
+                hideDetails.stop();
+                root.popupOpen = true;
+            } else {
+                hideDetails.restart();
+            }
+        }
     }
 
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.refresh()
+        onClicked: root.toggleDetails()
     }
 
     Timer {
-        interval: root.refreshInterval
-        running: true
-        repeat: true
-        onTriggered: root.refresh()
+        id: hideDetails
+        interval: root.hoverGraceMs
+        onTriggered: {
+            if (!hover.hovered && !detailsHover.hovered && !root.pinned)
+                root.popupOpen = false;
+        }
     }
 
-    Process {
-        id: pacmanProc
+    Component.onCompleted: UpdateService.ensureStarted()
 
-        command: ["sh", "-c", "command -v checkupdates >/dev/null || exit 127; checkupdates 2>/dev/null || true"]
-        stdout: SplitParser {
-            onRead: data => root.pacmanOutput += data
-        }
-        stderr: SplitParser {}
-        onExited: (code, status) => root.pacmanCount =
-            code === 127 ? -1 : root.countLines(root.pacmanOutput)
-    }
+    PopupWindow {
+        implicitWidth: details.width
+        implicitHeight: details.height
+        visible: root.popupOpen
+        color: "transparent"
+        anchor.item: root
+        anchor.edges: Edges.Top
+        anchor.gravity: Edges.Top
+        anchor.margins.top: 12
 
-    Process {
-        id: paruProc
+        UpdateDetails {
+            id: details
+            barState: root.barState
+            title: root.title
+            description: root.description
+            accent: root.accent
+            checking: root.checking
+            onRefreshRequested: UpdateService.refresh()
+            onCloseRequested: root.closeDetails()
 
-        command: ["sh", "-c", "command -v paru >/dev/null || exit 127; paru -Qua 2>/dev/null || true"]
-        stdout: SplitParser {
-            onRead: data => root.paruOutput += data
-        }
-        stderr: SplitParser {}
-        onExited: (code, status) => root.paruCount =
-            code === 127 ? -1 : root.countLines(root.paruOutput)
-    }
-
-    Component.onCompleted: refresh()
-
-    component PackageCount: Item {
-        required property string label
-        required property int count
-        required property color accent
-        required property color fill
-
-        readonly property string countText: count < 0
-            ? (root.checking ? "..." : "--") : String(count)
-
-        implicitWidth: root.chipWidth
-        implicitHeight: root.chipHeight
-        width: implicitWidth
-        height: implicitHeight
-
-        Rectangle {
-            anchors.fill: parent
-            radius: root.chipRadius
-            color: Qt.tint(fill, Qt.alpha(accent, root.hoverProgress * 0.08))
-            border.width: 1
-            border.color: Qt.alpha(accent, count > 0
-                ? 0.48 + root.hoverProgress * 0.28
-                : 0.18 + root.hoverProgress * 0.2)
-
-            Behavior on color {
-                ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
-            }
-
-            Behavior on border.color {
-                ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
-            }
-        }
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.leftMargin: 4
-            anchors.verticalCenter: parent.verticalCenter
-            width: 3
-            height: 12
-            radius: 2
-            color: count > 0 ? accent : Theme.outline
-
-            Behavior on color {
-                ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
-            }
-        }
-
-        Row {
-            id: chipRow
-
-            anchors.centerIn: parent
-            spacing: 4
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: label
-                color: count > 0 ? Qt.alpha(accent, 0.95) : Theme.outline
-                renderType: Text.NativeRendering
-                font.family: Theme.bodyFont
-                font.pixelSize: root.labelSize
-                font.weight: Font.DemiBold
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: countText
-                color: accent
-                renderType: Text.NativeRendering
-                font.family: Theme.monoFont
-                font.pixelSize: root.numberSize
-                font.weight: count > 0 ? Font.Bold : Font.DemiBold
-
-                Behavior on color {
-                    ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
+            HoverHandler {
+                id: detailsHover
+                onHoveredChanged: {
+                    if (hovered)
+                        hideDetails.stop();
+                    else
+                        hideDetails.restart();
                 }
             }
         }
