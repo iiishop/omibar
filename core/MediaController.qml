@@ -13,8 +13,33 @@ QtObject {
     readonly property list<MprisPlayer> players: Mpris.players.values
     // 多播放器共存时（浏览器 + 音乐播放器）优先正在播放的那个，
     // 否则回落到第一个，避免 bar 停在无曲目的播放器上显示空白。
-    readonly property MprisPlayer active: players.find(player => player.isPlaying)
-        ?? (players.length > 0 ? players[0] : null)
+    // 多个同时播放时以「最近一次开始播放」为准：谁最后按的播放键谁说话。
+    property var playStarts: []      // [{ player, at }]
+    property int playStartSerial: 0
+
+    readonly property MprisPlayer active: {
+        playStartSerial;             // 依赖扫描结果，时间戳更新后重算
+        const list = players;
+        if (list.length === 0)
+            return null;
+
+        const playing = list.filter(player => player.isPlaying);
+        if (playing.length === 0)
+            return list[0];
+        if (playing.length === 1)
+            return playing[0];
+
+        let best = playing[0];
+        let bestAt = startTimeOf(best);
+        for (let i = 1; i < playing.length; ++i) {
+            const at = startTimeOf(playing[i]);
+            if (at > bestAt) {
+                best = playing[i];
+                bestAt = at;
+            }
+        }
+        return best;
+    }
     readonly property bool hasLyrics: lyricEntries.length > 0
     readonly property bool shouldRunCava: BarState.mediaAvailable
         && BarState.mediaPlaying
@@ -27,6 +52,42 @@ QtObject {
     property real positionAnchor: 0
     property real positionAnchorMs: 0
     property var lyricEntries: []
+
+    function startTimeOf(player): real {
+        for (const entry of playStarts) {
+            if (entry.player === player)
+                return entry.at;
+        }
+        return 0;
+    }
+
+    // isPlaying 从 false 变 true 的时刻。扫描比逐 player 挂 Connections 简单，
+    // 500ms 的延迟对「谁在说话」这种判断无所谓。
+    function refreshPlayStarts(): void {
+        const now = Date.now();
+        const next = [];
+        let started = false;
+        for (const player of players) {
+            const prevAt = startTimeOf(player);
+            if (player.isPlaying) {
+                if (prevAt === 0)
+                    started = true;
+                next.push({ player: player, at: prevAt === 0 ? now : prevAt });
+            } else {
+                next.push({ player: player, at: 0 });
+            }
+        }
+        playStarts = next;
+        if (started)
+            playStartSerial += 1;
+    }
+
+    readonly property Timer playStartTimer: Timer {
+        interval: 500
+        running: true
+        repeat: true
+        onTriggered: root.refreshPlayStarts()
+    }
 
     function textValue(value): string {
         if (Array.isArray(value))
@@ -258,7 +319,11 @@ QtObject {
         syncPosition(player);
     }
 
-    onActiveChanged: refreshPlayer()
+    onActiveChanged: {
+        console.log("[media] active ->", active === null ? "null"
+            : (active.identity + " / " + active.isPlaying));
+        refreshPlayer();
+    }
 
     readonly property Connections activeConnections: Connections {
         target: root.active

@@ -23,6 +23,7 @@ Item {
     readonly property int lyricSideInset: showLyrics ? 20 : 0
     readonly property int metadataInset: showMetadata ? 18 : 7
     readonly property bool hovered: hoverHandler.hovered
+    readonly property bool pointerInside: hoverHandler.hovered || cardHover.hovered
     readonly property bool hasTitle: barState.mediaTitle !== ""
     readonly property bool hasArtist: barState.mediaArtist !== ""
     readonly property bool showMetadata: barState.mediaAvailable && (hasTitle || hasArtist)
@@ -121,6 +122,11 @@ Item {
         const rest = total % 60;
         return minutes + ":" + (rest < 10 ? "0" : "") + rest;
     }
+
+    onIslandOpenChanged: console.log("[island] open:", islandOpen,
+                                     "hovered:", hovered,
+                                     "available:", barState.mediaAvailable,
+                                     "playing:", barState.mediaPlaying)
 
     onExpandedChanged: {
         if (expanded) {
@@ -238,17 +244,31 @@ Item {
         HoverHandler {
             id: hoverHandler
 
-            onHoveredChanged: {
-                if (hovered) {
-                    closeTimer.stop();
-                    if (root.barState.mediaAvailable)
-                        openTimer.restart();
-                } else {
-                    openTimer.stop();
-                    closeTimer.restart();
-                }
-            }
+            onHoveredChanged: root.updatePointer()
         }
+    }
+
+    // 卡片内容区再挂一个：鼠标抓取（按下按钮、拖进度条）期间指针事件的归属会变，
+    // 光靠外面那块判定容易在点击瞬间丢掉 hover，导致卡片收回。
+    function updatePointer(): void {
+        if (pointerInside) {
+            closeTimer.stop();
+            if (root.barState.mediaAvailable)
+                openTimer.restart();
+        } else {
+            openTimer.stop();
+            closeTimer.restart();
+        }
+    }
+
+    // 交互期间强制保持：按下就停表，松手再看指针是不是还在岛里。
+    function holdOpen(): void {
+        closeTimer.stop();
+    }
+
+    function releaseHold(): void {
+        if (!pointerInside)
+            closeTimer.restart();
     }
 
     Timer {
@@ -257,7 +277,7 @@ Item {
         // 悬停意图确认时间：太长会有「停一下才长」的滞后感。
         interval: 160
         onTriggered: {
-            if (hoverHandler.hovered && root.barState.mediaAvailable)
+            if (root.pointerInside && root.barState.mediaAvailable)
                 root.islandOpen = true;
         }
     }
@@ -268,7 +288,7 @@ Item {
         // 从胶囊区移到卡片上沿要跨 160px，360ms 太紧；这里留出余量。
         interval: 520
         onTriggered: {
-            if (!hoverHandler.hovered)
+            if (!root.pointerInside)
                 root.islandOpen = false;
         }
     }
@@ -552,6 +572,12 @@ Item {
 
         Behavior on opacity {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+        }
+
+        HoverHandler {
+            id: cardHover
+
+            onHoveredChanged: root.updatePointer()
         }
 
         // ---- 封面 + 环形进度 ----
@@ -839,6 +865,7 @@ Item {
                     }
 
                     onPressed: mouse => {
+                        root.holdOpen();
                         progressTrack.dragProgress = ratioAt(mouse.x);
                         MediaController.seek(progressTrack.dragProgress);
                     }
@@ -846,8 +873,14 @@ Item {
                         if (pressed)
                             progressTrack.dragProgress = ratioAt(mouse.x);
                     }
-                    onReleased: progressTrack.dragProgress = -1
-                    onCanceled: progressTrack.dragProgress = -1
+                    onReleased: {
+                        progressTrack.dragProgress = -1;
+                        root.releaseHold();
+                    }
+                    onCanceled: {
+                        progressTrack.dragProgress = -1;
+                        root.releaseHold();
+                    }
                 }
             }
         }
@@ -968,6 +1001,9 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: btn.available ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onPressed: root.holdOpen()
+            onReleased: root.releaseHold()
+            onCanceled: root.releaseHold()
             onClicked: {
                 if (btn.available)
                     btn.tapped();
