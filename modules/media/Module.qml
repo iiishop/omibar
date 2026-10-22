@@ -1,4 +1,6 @@
-// media module - fixed-width lyrics, controls, progress, and fallback spectrum.
+// media module - 灵动岛式媒体胶囊：同一个形状在胶囊与卡片之间连续形变。
+// 收起态显示歌词/频谱/进度；hover 后向上长成卡片，展开封面与控制。
+// 展开时只抬高自身并向上溢出，不改整条 bar 的高度（AvoidingCapsule.row 高度已锁定）。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -41,15 +43,142 @@ Item {
         : (barState.mediaPlayMode === "repeatTrack" ? "repeat_one" : "playlist_play")
     readonly property bool playModeActive: barState.mediaPlayMode !== "sequential"
 
+    // ---- 灵动岛几何 ----
+    readonly property int expandedWidth: 380
+    readonly property int expandedHeight: 196
+    readonly property int collapsedHeight: barState.moduleHeight
+    // 尺寸由本模块自己驱动（宽高同一条曲线、同一时长），外壳纯跟随。
+    // 让外壳做宽度动画而模块做高度动画，两条曲线不同步，中间态形状会被拉扯。
+    readonly property bool drivesOwnSize: true
+    property bool islandOpen: false
+    readonly property bool expanded: islandOpen
+    readonly property bool hasArt: barState.mediaArtUrl !== ""
+    readonly property string cardTitle: hasTitle ? barState.mediaTitle : barState.mediaArtist
+    readonly property string cardSubtitle: {
+        if (!hasTitle || !hasArtist)
+            return "";
+        return barState.mediaAlbum !== ""
+            ? barState.mediaArtist + " · " + barState.mediaAlbum
+            : barState.mediaArtist;
+    }
+
+    property real animWidth: 0
+    property real animHeight: 0
+    width: animWidth
+    height: animHeight
+    implicitWidth: animWidth
+    implicitHeight: animHeight
+
+    Component.onCompleted: {
+        animWidth = lyricMetrics.width;
+        animHeight = collapsedHeight;
+    }
+
+    ParallelAnimation {
+        id: expandAnim
+
+        NumberAnimation {
+            target: root
+            property: "animWidth"
+            to: root.expandedWidth
+            duration: 500
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.1, 0.68, 0.28, 1.02, 0.64, 1.035, 0.78, 1.035, 0.96, 1, 1, 1]
+        }
+
+        NumberAnimation {
+            target: root
+            property: "animHeight"
+            to: root.expandedHeight
+            duration: 500
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.1, 0.68, 0.28, 1.02, 0.64, 1.035, 0.78, 1.035, 0.96, 1, 1, 1]
+        }
+    }
+
+    ParallelAnimation {
+        id: collapseAnim
+
+        NumberAnimation {
+            target: root
+            property: "animWidth"
+            to: lyricMetrics.width
+            duration: 360
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.16, 0.68, 0.36, 1, 1, 1]
+        }
+
+        NumberAnimation {
+            target: root
+            property: "animHeight"
+            to: root.collapsedHeight
+            duration: 360
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.16, 0.68, 0.36, 1, 1, 1]
+        }
+    }
+
+    function timeText(seconds: real): string {
+        const total = Math.max(0, Math.floor(seconds));
+        const minutes = Math.floor(total / 60);
+        const rest = total % 60;
+        return minutes + ":" + (rest < 10 ? "0" : "") + rest;
+    }
+
+    onExpandedChanged: {
+        if (expanded) {
+            closeTimer.stop();
+            shrinkWindow.stop();
+            barState.islandExpandExtent = expandedHeight - collapsedHeight;
+            collapseAnim.stop();
+            expandAnim.restart();
+        } else {
+            openTimer.stop();
+            expandAnim.stop();
+            collapseAnim.restart();
+            // 收起动画跑完再缩回外壳高度，避免半途被裁。
+            shrinkWindow.restart();
+        }
+    }
+    Component.onDestruction: barState.islandExpandExtent = 0
+
+    Timer {
+        id: shrinkWindow
+
+        interval: 400
+        onTriggered: {
+            if (!root.islandOpen)
+                root.barState.islandExpandExtent = 0;
+        }
+    }
+
+    // ---- 形状本体：胶囊与卡片是同一个矩形 ----
+    // 宽度必须等于外壳（root + 两侧 hPadding），否则卡片表面比外壳窄 32px，
+    // 邻居之间的视觉间距就会从 10 变成 26，收起时又突变回 10。
+    Rectangle {
+        id: surface
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        width: parent.width + 32
+        height: parent.height
+        // radius 用离散值：绑到每帧都在变的 height 会让 Behavior 每帧重启。
+        radius: root.expanded ? 24 : root.collapsedHeight / 2
+        color: Theme.surfaceContainerHigh
+        clip: true
+
+        Behavior on radius {
+            NumberAnimation {
+                duration: 320
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: [0.16, 0.68, 0.36, 1, 1, 1]
+            }
+        }
+    }
+
     property string displayedLyric: sourceLyric
     property real lyricOpacity: showLyricText ? 1 : 0
     property real phase: 0
-
-    implicitWidth: lyricMetrics.width
-    implicitHeight: barState.moduleHeight
-    width: implicitWidth
-    height: implicitHeight
-    clip: true
 
     function spectrumValue(index: int): real {
         const values = barState.mediaSpectrum ?? [];
@@ -98,6 +227,38 @@ Item {
 
     HoverHandler {
         id: hoverHandler
+
+        onHoveredChanged: {
+            if (hovered) {
+                closeTimer.stop();
+                if (root.barState.mediaAvailable)
+                    openTimer.restart();
+            } else {
+                openTimer.stop();
+                closeTimer.restart();
+            }
+        }
+    }
+
+    Timer {
+        id: openTimer
+
+        // 悬停意图确认时间：太长会有「停一下才长」的滞后感。
+        interval: 160
+        onTriggered: {
+            if (hoverHandler.hovered && root.barState.mediaAvailable)
+                root.islandOpen = true;
+        }
+    }
+
+    Timer {
+        id: closeTimer
+
+        interval: 360
+        onTriggered: {
+            if (!hoverHandler.hovered)
+                root.islandOpen = false;
+        }
     }
 
     Timer {
@@ -108,271 +269,511 @@ Item {
         onTriggered: root.phase += root.barState.mediaPlaying ? 0.22 : 0.055
     }
 
+    // IPC 调试入口：`qs -p <repo> ipc call omibar demoMediaCard`
+    Connections {
+        target: root.barState
+
+        function onMediaCardPulseChanged(): void {
+            root.islandOpen = !root.islandOpen;
+        }
+    }
+
+    // ======== 收起态内容（固定 32 高，贴底） ========
     Item {
-        id: spectrum
+        id: compact
 
-        anchors.fill: parent
-        anchors.leftMargin: 8
-        anchors.rightMargin: 8
-        anchors.topMargin: root.showMetadata ? 13 : 5
-        anchors.bottomMargin: 6
-        opacity: root.barState.mediaAvailable && !root.showLyrics && !root.hovered ? 1 : 0
-
-        Repeater {
-            model: root.spectrumBars
-
-            delegate: Item {
-                id: barSlot
-
-                required property int index
-
-                readonly property real amount: root.spectrumValue(index)
-                readonly property real slotWidth: spectrum.width / root.spectrumBars
-
-                x: index * slotWidth
-                y: 0
-                width: slotWidth
-                height: spectrum.height
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 3
-                    height: 4 + barSlot.amount * (spectrum.height - 4)
-                    radius: width / 2
-                    color: root.spectrumColor(index, 0.74)
-
-                    Behavior on height {
-                        NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                    }
-                }
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 5 + barSlot.amount * 9
-                    height: 5 + barSlot.amount * 9
-                    radius: width / 2
-                    color: "transparent"
-                    border.width: 1
-                    border.color: root.spectrumColor(index + 1,
-                        0.16 + barSlot.amount * 0.22)
-                    opacity: 0.9
-
-                    Behavior on width {
-                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                    }
-
-                    Behavior on height {
-                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                    }
-                }
-            }
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
-        }
-    }
-
-    Item {
-        id: playingMark
-
-        x: 7
-        y: 4
-        width: 8
-        height: 8
-        opacity: root.showMetadata && !root.hovered ? 1 : 0
-
-        Repeater {
-            model: 3
-
-            delegate: Rectangle {
-                required property int index
-
-                readonly property real wave: Math.sin(root.phase + index * 1.35) * 0.5 + 0.5
-
-                x: index * 3
-                anchors.verticalCenter: parent.verticalCenter
-                width: 1.5
-                height: root.barState.mediaPlaying ? 3 + wave * 5 : 3
-                radius: width / 2
-                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b,
-                    root.barState.mediaPlaying ? 0.85 : 0.42)
-
-                Behavior on height {
-                    NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
-                }
-            }
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
-        }
-    }
-
-    Text {
-        id: titleText
-
-        x: root.metadataInset
-        y: 2
-        width: root.titleWidth
-        height: 11
-        text: root.hasTitle ? root.barState.mediaTitle : root.barState.mediaArtist
-        horizontalAlignment: Text.AlignLeft
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
-        color: root.hasTitle ? Theme.secondary : Theme.tertiary
-        renderType: Text.NativeRendering
-        font.family: Theme.bodyFont
-        font.pixelSize: root.metadataSize
-        font.weight: Font.Medium
-        opacity: root.showMetadata && !root.hovered ? 0.88 : 0
-
-        Behavior on opacity {
-            NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
-        }
-    }
-
-    Rectangle {
-        x: titleText.x + root.titleWidth + 3
-        y: 7
-        width: root.hasTitle && root.hasArtist ? 2 : 0
-        height: width
-        radius: width / 2
-        color: Theme.outline
-        opacity: root.showMetadata && !root.hovered ? 0.72 : 0
-
-        Behavior on opacity {
-            NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
-        }
-    }
-
-    Text {
-        id: artistText
-
-        x: titleText.x + root.titleWidth + root.separatorWidth
-        y: 2
-        width: root.artistWidth
-        height: 11
-        text: root.hasArtist ? root.barState.mediaArtist : ""
-        horizontalAlignment: Text.AlignLeft
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
-        color: Theme.tertiary
-        renderType: Text.NativeRendering
-        font.family: Theme.bodyFont
-        font.pixelSize: root.metadataSize
-        font.weight: Font.Medium
-        opacity: root.showMetadata && !root.hovered && root.hasTitle && root.hasArtist ? 0.9 : 0
-
-        Behavior on opacity {
-            NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
-        }
-    }
-
-    Text {
-        id: lyricText
-
-        x: root.lyricSideInset
-        y: root.showMetadata && root.showLyrics ? 10 : 0
-        width: parent.width - root.lyricSideInset * 2
-        height: parent.height - y - 2
-        text: root.displayedLyric
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
-        color: root.barState.mediaAvailable ? Theme.fg : Theme.fgVariant
-        renderType: Text.NativeRendering
-        font.family: Theme.bodyFont
-        font.pixelSize: root.lyricSize
-        font.weight: Font.Medium
-        opacity: root.lyricOpacity
-    }
-
-    SideSpectrum {
-        side: -1
-    }
-
-    SideSpectrum {
-        side: 1
-    }
-
-    Row {
-        id: controls
-
-        anchors.centerIn: parent
-        spacing: root.controlGap
-        opacity: root.hovered && root.barState.mediaAvailable ? 1 : 0
-
-        MediaButton {
-            iconName: root.playModeIcon
-            highlighted: root.playModeActive
-            enabled: root.barState.mediaPlayModeAvailable
-            onClicked: MediaController.cyclePlayMode()
-        }
-
-        MediaButton {
-            iconName: "skip_previous"
-            enabled: MediaController.active !== null && MediaController.active.canGoPrevious
-            onClicked: MediaController.previous()
-        }
-
-        MediaButton {
-            iconName: root.barState.mediaPlaying ? "pause" : "play_arrow"
-            enabled: MediaController.active !== null && MediaController.active.canTogglePlaying
-            onClicked: MediaController.toggle()
-        }
-
-        MediaButton {
-            iconName: "skip_next"
-            enabled: MediaController.active !== null && MediaController.active.canGoNext
-            onClicked: MediaController.next()
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-        }
-    }
-
-    Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: 2
-        radius: 1
-        color: Qt.rgba(Theme.outlineVariant.r, Theme.outlineVariant.g, Theme.outlineVariant.b, 0.42)
-        opacity: root.barState.mediaAvailable ? 1 : 0
+        height: root.collapsedHeight
+        opacity: root.expanded ? 0 : 1
+        visible: opacity > 0.01
+
+        Behavior on opacity {
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+
+        Item {
+            id: spectrum
+
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: root.showMetadata ? 13 : 5
+            anchors.bottomMargin: 6
+            opacity: root.barState.mediaAvailable && !root.showLyrics && !root.hovered ? 1 : 0
+
+            Repeater {
+                model: root.spectrumBars
+
+                delegate: Item {
+                    id: barSlot
+
+                    required property int index
+
+                    readonly property real amount: root.spectrumValue(index)
+                    readonly property real slotWidth: spectrum.width / root.spectrumBars
+
+                    x: index * slotWidth
+                    y: 0
+                    width: slotWidth
+                    height: spectrum.height
+
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 3
+                        height: 4 + barSlot.amount * (spectrum.height - 4)
+                        radius: width / 2
+                        color: root.spectrumColor(index, 0.74)
+
+                        Behavior on height {
+                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 5 + barSlot.amount * 9
+                        height: 5 + barSlot.amount * 9
+                        radius: width / 2
+                        color: "transparent"
+                        border.width: 1
+                        border.color: root.spectrumColor(index + 1,
+                            0.16 + barSlot.amount * 0.22)
+                        opacity: 0.9
+
+                        Behavior on width {
+                            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                        }
+
+                        Behavior on height {
+                            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                        }
+                    }
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Item {
+            id: playingMark
+
+            x: 7
+            y: 4
+            width: 8
+            height: 8
+            opacity: root.showMetadata && !root.hovered ? 1 : 0
+
+            Repeater {
+                model: 3
+
+                delegate: Rectangle {
+                    required property int index
+
+                    readonly property real wave: Math.sin(root.phase + index * 1.35) * 0.5 + 0.5
+
+                    x: index * 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 1.5
+                    height: root.barState.mediaPlaying ? 3 + wave * 5 : 3
+                    radius: width / 2
+                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b,
+                        root.barState.mediaPlaying ? 0.85 : 0.42)
+
+                    Behavior on height {
+                        NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+                    }
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Text {
+            id: titleText
+
+            x: root.metadataInset
+            y: 2
+            width: root.titleWidth
+            height: 11
+            text: root.hasTitle ? root.barState.mediaTitle : root.barState.mediaArtist
+            horizontalAlignment: Text.AlignLeft
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+            color: root.hasTitle ? Theme.secondary : Theme.tertiary
+            renderType: Text.NativeRendering
+            font.family: Theme.bodyFont
+            font.pixelSize: root.metadataSize
+            font.weight: Font.Medium
+            opacity: root.showMetadata && !root.hovered ? 0.88 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Rectangle {
+            x: titleText.x + root.titleWidth + 3
+            y: 7
+            width: root.hasTitle && root.hasArtist ? 2 : 0
+            height: width
+            radius: width / 2
+            color: Theme.outline
+            opacity: root.showMetadata && !root.hovered ? 0.72 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Text {
+            id: artistText
+
+            x: titleText.x + root.titleWidth + root.separatorWidth
+            y: 2
+            width: root.artistWidth
+            height: 11
+            text: root.hasArtist ? root.barState.mediaArtist : ""
+            horizontalAlignment: Text.AlignLeft
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+            color: Theme.tertiary
+            renderType: Text.NativeRendering
+            font.family: Theme.bodyFont
+            font.pixelSize: root.metadataSize
+            font.weight: Font.Medium
+            opacity: root.showMetadata && !root.hovered && root.hasTitle && root.hasArtist ? 0.9 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Text {
+            id: lyricText
+
+            x: root.lyricSideInset
+            y: root.showMetadata && root.showLyrics ? 10 : 0
+            width: parent.width - root.lyricSideInset * 2
+            height: parent.height - y - 2
+            text: root.displayedLyric
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+            color: root.barState.mediaAvailable ? Theme.fg : Theme.fgVariant
+            renderType: Text.NativeRendering
+            font.family: Theme.bodyFont
+            font.pixelSize: root.lyricSize
+            font.weight: Font.Medium
+            opacity: root.lyricOpacity
+        }
+
+        SideSpectrum {
+            side: -1
+        }
+
+        SideSpectrum {
+            side: 1
+        }
+
 
         Rectangle {
             anchors.left: parent.left
-            anchors.top: parent.top
+            anchors.right: parent.right
             anchors.bottom: parent.bottom
-            width: parent.width * root.barState.mediaProgress
-            radius: parent.radius
-            color: Theme.primary
-
-            Behavior on width {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
-        }
-
-        Rectangle {
-            x: Math.max(0, parent.width * root.barState.mediaProgress - width)
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.barState.mediaProgress > 0 ? 8 : 0
             height: 2
-            radius: height / 2
-            color: Theme.tertiary
-            opacity: root.barState.mediaAvailable ? 0.86 : 0
+            radius: 1
+            color: Qt.rgba(Theme.outlineVariant.r, Theme.outlineVariant.g, Theme.outlineVariant.b, 0.42)
+            opacity: root.barState.mediaAvailable && !root.expanded ? 1 : 0
 
-            Behavior on x {
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: parent.width * root.barState.mediaProgress
+                radius: parent.radius
+                color: Theme.primary
+
+                Behavior on width {
+                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                }
+            }
+
+            Rectangle {
+                x: Math.max(0, parent.width * root.barState.mediaProgress - width)
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.barState.mediaProgress > 0 ? 8 : 0
+                height: 2
+                radius: height / 2
+                color: Theme.tertiary
+                opacity: root.barState.mediaAvailable ? 0.86 : 0
+
+                Behavior on x {
+                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
             }
         }
+    }
+
+    // ======== 展开态内容：和胶囊同一块 surface ========
+    Item {
+        id: card
+
+        // 相对 surface 排布，才能吃到那 32px 的 padding：
+        // 卡片内容区 = 外壳宽 - 32，两侧各 16。
+        anchors.fill: surface
+        anchors.margins: 16
+        opacity: root.expanded ? 1 : 0
+        visible: opacity > 0.01
+        enabled: root.expanded
 
         Behavior on opacity {
-            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+        }
+
+        Item {
+            id: header
+
+            width: parent.width
+            height: 88
+
+            Rectangle {
+                id: coverFrame
+
+                width: 88
+                height: 88
+                radius: 18
+                color: Theme.surfaceContainerHighest
+                clip: true
+
+                Image {
+                    anchors.fill: parent
+                    visible: root.hasArt
+                    source: root.hasArt ? root.barState.mediaArtUrl : ""
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: true
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    visible: !root.hasArt
+                    text: "music_note"
+                    color: Theme.outline
+                    renderType: Text.NativeRendering
+                    font.family: Theme.iconFont
+                    font.pixelSize: 32
+                    font.variableAxes: { "FILL": 1, "GRAD": -20 }
+                }
+            }
+
+            Column {
+                anchors.left: coverFrame.right
+                anchors.leftMargin: 16
+                anchors.right: parent.right
+                anchors.verticalCenter: coverFrame.verticalCenter
+                spacing: 5
+
+                Text {
+                    width: parent.width
+                    text: root.cardTitle
+                    color: Theme.fg
+                    elide: Text.ElideRight
+                    renderType: Text.NativeRendering
+                    font.family: Theme.bodyFont
+                    font.pixelSize: 16
+                    font.weight: Font.Medium
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.cardSubtitle !== ""
+                    text: root.cardSubtitle
+                    color: Theme.secondary
+                    elide: Text.ElideRight
+                    renderType: Text.NativeRendering
+                    font.family: Theme.bodyFont
+                    font.pixelSize: 12
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.showLyrics
+                    text: root.showLyrics ? root.barState.mediaLyric : ""
+                    color: Theme.fgVariant
+                    elide: Text.ElideRight
+                    renderType: Text.NativeRendering
+                    font.family: Theme.bodyFont
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                }
+            }
+        }
+
+        Item {
+            id: progress
+
+            anchors.top: header.bottom
+            anchors.topMargin: 14
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 18
+
+            Text {
+                id: positionText
+
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.timeText(root.barState.mediaPosition)
+                color: Theme.outline
+                renderType: Text.NativeRendering
+                font.family: Theme.monoFont
+                font.pixelSize: 10
+            }
+
+            Text {
+                id: lengthText
+
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.timeText(root.barState.mediaLength)
+                color: Theme.outline
+                renderType: Text.NativeRendering
+                font.family: Theme.monoFont
+                font.pixelSize: 10
+            }
+
+            Item {
+                anchors.left: positionText.right
+                anchors.leftMargin: 10
+                anchors.right: lengthText.left
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                height: 4
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 2
+                    color: Qt.rgba(Theme.outlineVariant.r, Theme.outlineVariant.g,
+                        Theme.outlineVariant.b, 0.42)
+                }
+
+                Rectangle {
+                    width: parent.width * root.barState.mediaProgress
+                    height: parent.height
+                    radius: 2
+                    color: Theme.primary
+
+                    Behavior on width {
+                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                    }
+                }
+
+                Rectangle {
+                    x: Math.max(0, parent.width * root.barState.mediaProgress - width)
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: root.barState.mediaProgress > 0 ? 10 : 0
+                    height: 4
+                    radius: 2
+                    color: Theme.tertiary
+
+                    Behavior on x {
+                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                    }
+                }
+            }
+        }
+
+        Item {
+            id: cardControls
+
+            anchors.top: progress.bottom
+            anchors.topMargin: 14
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 30
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 6
+
+                Repeater {
+                    model: [
+                        { icon: root.playModeIcon, action: "mode", active: root.playModeActive, enabled: root.barState.mediaPlayModeAvailable },
+                        { icon: "skip_previous", action: "previous", active: false, enabled: MediaController.active !== null && MediaController.active.canGoPrevious },
+                        { icon: root.barState.mediaPlaying ? "pause" : "play_arrow", action: "toggle", active: false, enabled: MediaController.active !== null && MediaController.active.canTogglePlaying },
+                        { icon: "skip_next", action: "next", active: false, enabled: MediaController.active !== null && MediaController.active.canGoNext }
+                    ]
+
+                    delegate: Item {
+                        id: button
+
+                        required property var modelData
+
+                        width: 30
+                        height: 30
+                        opacity: modelData.enabled ? 1 : 0.35
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: height / 2
+                            color: button.modelData.active
+                                ? Qt.rgba(Theme.secondaryContainer.r, Theme.secondaryContainer.g,
+                                    Theme.secondaryContainer.b, 0.66)
+                                : buttonMouse.containsMouse
+                                ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.16)
+                                : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
+
+                            Behavior on color {
+                                ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: button.modelData.icon
+                            color: button.modelData.active ? Theme.primary : Theme.fg
+                            renderType: Text.NativeRendering
+                            font.family: Theme.iconFont
+                            font.pixelSize: 18
+                            font.variableAxes: { "FILL": 1, "GRAD": -20 }
+                        }
+
+                        MouseArea {
+                            id: buttonMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: button.modelData.enabled
+                                ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: {
+                                if (!button.modelData.enabled)
+                                    return;
+                                const action = button.modelData.action;
+                                if (action === "mode")
+                                    MediaController.cyclePlayMode();
+                                else if (action === "previous")
+                                    MediaController.previous();
+                                else if (action === "toggle")
+                                    MediaController.toggle();
+                                else if (action === "next")
+                                    MediaController.next();
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -402,55 +803,6 @@ Item {
         }
     }
 
-    component MediaButton: Item {
-        id: buttonRoot
-
-        required property string iconName
-        property bool highlighted: false
-        signal clicked()
-
-        width: root.buttonSize
-        height: root.buttonSize
-        opacity: enabled ? 1 : 0.35
-
-        Rectangle {
-            anchors.fill: parent
-            radius: height / 2
-            color: buttonRoot.highlighted
-                ? Qt.rgba(Theme.secondaryContainer.r, Theme.secondaryContainer.g,
-                    Theme.secondaryContainer.b, mouseArea.containsMouse ? 0.78 : 0.58)
-                : mouseArea.containsMouse
-                ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.16)
-                : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
-
-            Behavior on color {
-                ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
-            }
-        }
-
-        Text {
-            anchors.centerIn: parent
-            text: buttonRoot.iconName
-            color: buttonRoot.highlighted ? Theme.primary : Theme.fg
-            renderType: Text.NativeRendering
-            font.family: Theme.iconFont
-            font.pixelSize: root.iconSize
-            font.variableAxes: { "FILL": 1, "GRAD": -20 }
-        }
-
-        MouseArea {
-            id: mouseArea
-
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: buttonRoot.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: {
-                if (buttonRoot.enabled)
-                    buttonRoot.clicked();
-            }
-        }
-    }
-
     component SideSpectrum: Item {
         id: sideRoot
 
@@ -458,10 +810,10 @@ Item {
 
         readonly property bool leftSide: side < 0
 
-        x: leftSide ? 3 : root.width - width - 3
+        x: leftSide ? 3 : compact.width - width - 3
         y: root.showMetadata ? 12 : 5
         width: 15
-        height: root.height - y - 5
+        height: compact.height - y - 5
         opacity: root.showLyrics && !root.hovered ? 0.82 : 0
 
         Repeater {

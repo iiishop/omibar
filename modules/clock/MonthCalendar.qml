@@ -8,6 +8,7 @@ Item {
     id: root
 
     required property date now
+    property BarState barState: BarState
     property bool open: false
 
     readonly property int enterDuration: 460
@@ -39,6 +40,12 @@ Item {
     function dayAt(index: int): int {
         const day = index - firstWeekday + 1;
         return day >= 1 && day <= daysInMonth ? day : 0;
+    }
+
+    function requestDate(key: string): void {
+        if (!barState.noteAvailable || !(barState.todoCountByDate[key] > 0)) return;
+        barState.noteDateRequest = key;
+        barState.noteDateRequestSerial++;
     }
 
     state: open ? "open" : ""
@@ -232,11 +239,17 @@ Item {
                                 readonly property bool inMonth: day > 0
                                 readonly property bool isToday: inMonth && day === root.today
                                 readonly property bool isWeekend: index % 7 >= 5
+                                readonly property string dateKey: Qt.formatDate(
+                                    new Date(root.now.getFullYear(), root.now.getMonth(), day), "yyyy-MM-dd")
+                                readonly property int todoCount: inMonth ? root.barState.todoCountByDate[dateKey] ?? 0 : 0
+                                readonly property int overdueCount: root.barState.overdueCountByDate[dateKey] ?? 0
+                                readonly property bool clickable: root.barState.noteAvailable && todoCount > 0
 
                                 width: root.cellSize
                                 height: root.cellSize
                                 radius: 12
                                 color: isToday ? Theme.primary
+                                    : dayHover.hovered && clickable ? Theme.surfaceContainerHighest
                                     : inMonth && isWeekend ? Qt.alpha(Theme.tertiary, 0.06)
                                     : "transparent"
 
@@ -250,16 +263,37 @@ Item {
                                     font.weight: dayCell.isToday ? Font.Bold : Font.Normal
                                 }
 
-                                Rectangle {
+                                Row {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     anchors.bottom: parent.bottom
                                     anchors.bottomMargin: 3
-                                    width: 3
-                                    height: 3
-                                    radius: 1.5
-                                    visible: dayCell.isToday
-                                    color: Theme.surface
+                                    spacing: 2
                                     Accessible.ignored: true
+                                    Repeater {
+                                        model: Math.min(dayCell.todoCount, 5)
+                                        Rectangle {
+                                            required property int index
+                                            width: 3
+                                            height: 3
+                                            radius: 1.5
+                                            color: dayCell.isToday ? Theme.surface
+                                                : index < dayCell.overdueCount ? Theme.error : Theme.tertiary
+                                        }
+                                    }
+                                }
+                                activeFocusOnTab: clickable
+                                Accessible.role: Accessible.Button
+                                Accessible.name: qsTr("%1，%2 项待办，%3 项已到期")
+                                    .arg(dateKey).arg(todoCount).arg(overdueCount)
+                                Accessible.onPressAction: root.requestDate(dateKey)
+                                border.width: activeFocus ? 1 : 0
+                                border.color: Theme.primary
+                                Keys.onReturnPressed: root.requestDate(dateKey)
+                                Keys.onSpacePressed: root.requestDate(dateKey)
+                                HoverHandler { id: dayHover; cursorShape: dayCell.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor }
+                                TapHandler {
+                                    enabled: dayCell.clickable
+                                    onTapped: root.requestDate(dayCell.dateKey)
                                 }
                             }
                         }

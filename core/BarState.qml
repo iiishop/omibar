@@ -28,17 +28,25 @@ QtObject {
     property bool notificationDnd: false
     property bool notificationStateReady: false
 
+    property var todoCountByDate: ({})
+    property var overdueCountByDate: ({})
+    property bool noteAvailable: false
+    property string noteDateRequest: ""
+    property int noteDateRequestSerial: 0
+
     property bool mediaAvailable: false
     property bool mediaPlaying: false
     property string mediaTitle: ""
     property string mediaArtist: ""
     property string mediaAlbum: ""
+    property string mediaArtUrl: ""
     property real mediaPosition: 0
     property real mediaLength: 0
     property bool mediaLyricsLoading: false
     property bool mediaLyricsAvailable: false
     property string mediaLyric: ""
     property var mediaSpectrum: []
+    property int mediaCardPulse: 0
     property string mediaPlayMode: "sequential"
     property bool mediaPlayModeAvailable: false
     readonly property real mediaProgress: mediaLength > 0
@@ -71,6 +79,8 @@ QtObject {
     }
 
     property real avoidanceWidth: 0
+    // 灵动岛展开时向胶囊上方借的高度，0 表示全部收起。
+    property real islandExpandExtent: 0
     readonly property real moduleHeight: 32
     readonly property real moduleGap: 10
     readonly property real launcherLeft: (screenWidth - launcherWidth) / 2

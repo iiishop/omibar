@@ -2,6 +2,7 @@
   "modules": [
     { "name": "media", "band": "left" },
     { "name": "clock", "band": "left" },
+    { "name": "note", "band": "left" },
     { "name": "updates", "band": "right" },
     { "name": "notifications", "band": "right" }
   ]

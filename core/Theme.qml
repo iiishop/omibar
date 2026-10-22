@@ -25,6 +25,9 @@ QtObject {
     property color tertiaryContainer: "#b58763"
     property color outline: "#9e8c91"
     property color outlineVariant: "#514347"
+    property color error: "#ffb4ab"
+    property color errorContainer: "#93000a"
+    property color errorForeground: "#690005"
 
     readonly property string bodyFont: "GoogleSansFlex"
     readonly property string monoFont: "CaskaydiaCove NF"
@@ -70,6 +73,9 @@ QtObject {
         root.outline = colorValue(colours, "outline", "outline", root.outline);
         root.outlineVariant = colorValue(colours, "outline_variant",
                                          "outlineVariant", root.outlineVariant);
+        root.error = colorValue(colours, "error", "error", root.error);
+        root.errorContainer = colorValue(colours, "error_container", "errorContainer", root.errorContainer);
+        root.errorForeground = colorValue(colours, "on_error", "onError", root.errorForeground);
     }
 
     function refresh(): void {

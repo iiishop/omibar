@@ -14,7 +14,7 @@ its optional caelestia integration.
 - `core/ModuleHost.qml` owns module placement and per-section avoidance bands.
 - `core/AvoidingCapsule.qml` owns per-band launcher avoidance and inertial lag.
 - `core/JellyMotion.qml` owns reusable squash, recoil, and inertial lag motion.
-- `core/ModuleHost.qml` owns per-module static visual shells.
+- `core/ModuleHost.qml` owns per-module shells and elastic width transitions.
 - `core/HoverMotion.qml` owns reusable hover response presets. It is separate
   from `JellyMotion`, which remains dedicated to travel/avoidance motion.
 
@@ -62,17 +62,18 @@ state.
 
 ## Avoidance Geometry
 
-`BarWindow` keeps the `PanelWindow` visible and transparent. The horizontal
-moving objects are the individual avoidance bands, not the layer-shell window
-itself.
+`BarWindow` keeps the `PanelWindow` visible and transparent, anchored across the
+screen as a thin bottom strip. Its width stays fixed during capsule animation.
+An input mask follows the two module rows, allowing pointer events outside the
+bands to pass through. Vertical padding accommodates the maximum surface bulge
+without changing the normal capsule bottom gap or explicit exclusive zone.
 
 The shift is derived in `BarState`:
 
 - `launcherWidth` is the expected launcher panel width.
 - `launcherPadding` is the minimum gap between launcher and omibar.
-- `avoidanceInset` is a conservative side inset based on the widest avoided
-  side stack, so the `PanelWindow` remains wide enough for either side
-  movement.
+- `avoidanceInset` describes conservative avoidance space based on the widest
+  side stack; it does not drive the layer-shell window width.
 
 Each `AvoidingCapsule` receives an explicit `movementDirection` from
 `ModuleHost`: left band is `-1`, right band is `1`. When `launcherOpen` is true,
@@ -85,9 +86,21 @@ the same binding returns that capsule to its neutral x position.
 
 Avoidance animation stays inside the bar internals:
 
-- `AvoidingCapsule.Behavior on x` gives each avoidance band a fixed-duration
-  `OutCubic` travel animation. Leaving avoidance is shorter than entering it.
-- `AvoidingCapsule.Behavior on width` smooths band width changes.
+- `AvoidingCapsule.Behavior on yieldProgress` gives each avoidance band a
+  fixed-duration `OutCubic` travel animation. Leaving avoidance is shorter than
+  entering it. Neutral x follows layout immediately; it has no separate animation
+  that could lag behind a width change.
+- `ModuleHost` animates each module shell's width with a 520 ms `OutBack` curve
+  and overshoot 1.6. The width passes its target once, then settles without
+  repeated oscillation. Band and inner panel widths follow the animated module
+  widths directly; the native window width remains fixed.
+- The signed width overshoot drives surface height: expansion beyond the target
+  compresses it, and contraction below the target makes it taller. Height changes
+  use a gain of 1.8, are limited to 10%, and return to normal with width, without an independent height
+  animation. Resizing applies no horizontal content lag; text is not scaled.
+  Content overflow is clipped while the shell is narrower than its target; the
+  background can bulge vertically. Initial loading and zero-width hiding are
+  immediate; ordinary size changes can reverse mid-flight from their current width.
 - `BarWindow.Behavior on y` smooths fullscreen vertical avoidance.
 - `JellyMotion` gives the module row a 14 px inertial lag opposite the current
   travel direction, then returns it to zero. The row itself is not scaled:
@@ -104,7 +117,7 @@ Avoidance animation stays inside the bar internals:
   infer movable modules from arbitrary `row.children`.
 - A registered shell with zero width is ignored by the active gap wave, so
   modules can hide by returning zero width without leaving a phantom gap.
-- `ModuleHost` wraps every loaded module in a static shell. It does not
+- `ModuleHost` wraps every loaded module in a shell. It does not
   read hover settings from the manifest and does not apply hover animation.
 - `HoverMotion` is only a reusable library. A module that wants hover motion
   must instantiate it inside its own `Module.qml`, so hover behavior stays owned
@@ -121,9 +134,18 @@ ways.
 creates transparent space between neighboring modules. The outer `panel` is
 transparent and only provides the neutral coordinate space.
 
-The content width reserves equal space for the wider side on both sides of the
-middle gap. That keeps the split between left and right bands aligned with the
-launcher center even when the two bands have different widths.
+The occupied span of both bands is centered as a whole. A capsule growing by a
+width delta shifts the span's start left by half that delta, cancelling the
+capsule center's own half-width increase. Its center stays fixed during expansion,
+contraction and reversal; neighbors move outward by half the delta. The band split
+may move away from the screen center when band widths differ. Launcher avoidance
+still places each band's inner edge outside the launcher independently.
+
+The inner bar is anchored to the fixed window content's horizontal center, with
+fractional center alignment enabled. Native window resizing and integer center
+rounding must not introduce horizontal movement during width interpolation.
+Both the capsule surface and its content expand about their center without an
+additional horizontal translation from the resize animation.
 
 - `bar.json` assigns each module to a motion `band`: `left` or `right`.
 - `leftCapsuleWidth` and `rightCapsuleWidth` come from the module row widths.
@@ -131,7 +153,8 @@ launcher center even when the two bands have different widths.
 - `sideExtent` and `avoidanceSideWidth` are the wider avoided side stack.
 - `BarState.moduleGap` is the single core gap used between modules and in
   section width reservation.
-- `contentWidth` is `sideExtent * 2 + middleGap`.
+- `contentWidth` is `leftCapsuleWidth + middleGap + rightCapsuleWidth`.
+- `sideExtent` is used for conservative avoidance space, not neutral alignment.
 - The updates module keeps a visible status label even when no updates are
   available. Its implicit width follows that label; the host owns capsule
   sizing and includes it in the normal band geometry.
@@ -140,7 +163,68 @@ If a module root is an `Item`, it must set real `width` and `height`, not only
 `implicitWidth` and `implicitHeight`, because `Row` placement depends on actual
 geometry.
 
+Run `sh tests/run-layout-tests.sh` to sample capsule centers throughout expansion,
+contraction and reversal in both bands, and verify launcher avoidance endpoints.
+
+## Island Expansion
+
+A module may grow taller than the capsule without changing the bar's height. The
+media module uses this to morph its own capsule into a card: one surface, one
+animation, no second window.
+
+The rules that make it work:
+
+- `AvoidingCapsule.row` has a locked `height: BarState.moduleHeight`. Neighbour
+  capsules therefore never move vertically and the bar strip keeps its height.
+- `ModuleHost`'s module shell takes
+  `implicitHeight: Math.max(BarState.moduleHeight, contentSlot.childrenRect.height)`
+  and positions itself with `y: parent.height - height`, so growth goes upward
+  out of the row instead of pushing the row taller.
+- `BarWindow` reserves `BarState.islandExpandExtent` in its own `implicitHeight`
+  and pins `panel` to the window's bottom edge with `anchors.bottomMargin`. The
+  window grows upward; the capsule row stays where it is. `exclusiveZone` is not
+  touched, so the desktop work area is unchanged while expanded.
+- `ModuleHost` drops the host-drawn capsule background
+  (`opacity: contentHeight > moduleHeight ? 0 : 1`) whenever a module exceeds the
+  capsule height. The module draws its own shape, so there is exactly one
+  visible surface at every frame of the transition.
+- `ModuleHost.inputRegion` extends each band upward by `islandExpandExtent` so the
+  expanded area can still receive pointer events; the collapsed strip keeps the
+  original capsule rectangle.
+
+The module drives the whole transition from its own `width`/`height` plus a
+`radius` animation, and cross-fades the collapsed and expanded content instead of
+swapping windows. Collapsed content is pinned to a fixed-height item at the
+bottom, so it never stretches while the shape grows.
+
 ## Debugging
+
+### Note windows and optional integration
+
+The note capsule measures fifteen CJK glyphs with `TextMetrics` in `Theme.bodyFont`.
+Its content width participates in the existing `ModuleHost` shell animation. The
+seven-card shelf lives in a transparent anchored `PopupWindow`, and the editor in
+one transparent `FloatingWindow`; neither adds children to the bar's layout or a
+second layer-shell panel. The shelf shares the clock's 140 ms hover grace period.
+
+Note owns its store and minute-precision reminder clock. It publishes only
+`todoCountByDate`, `overdueCountByDate` and `noteAvailable` through `BarState`.
+Clock sends `noteDateRequest` plus an incrementing serial, so clicking the same date
+twice still delivers two requests. Unloading note clears its summaries. Neither
+module imports the other.
+
+Note reads DND exclusively from `BarState.notificationDnd`; it never probes
+caelestia. The optional audio process probes local players once, and missing players
+or playback failures mean visual-only alerts. `Theme.error`, `errorContainer` and
+`errorForeground` map the scheme's `error`, `error_container` and `on_error` slots.
+The last property avoids QML's reserved `onError` handler spelling.
+
+Autosave uses atomic `FileView` writes. Close and unload wait for any asynchronous
+write before a synchronous flush: this ordering prevents Quickshell 0.3's pending
+write cancellation from dropping the next payload. Parse failures disable editing
+without overwriting the file; failed saves retain the in-memory document for retry.
+
+### Launcher checks
 
 Useful read-only checks:
 

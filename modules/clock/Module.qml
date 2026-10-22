@@ -129,6 +129,7 @@ Item {
             id: calendar
 
             now: root.now
+            barState: root.barState
             open: root.calendarOpen
 
             HoverHandler {

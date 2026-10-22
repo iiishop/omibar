@@ -15,6 +15,16 @@ Item {
     required property real neutralScreenX
     required property real movementOriginX
 
+    readonly property int resizeDuration: 520
+    readonly property real resizeOvershoot: 1.6
+    readonly property real resizeHeightGain: 1.8
+    readonly property real resizeHeightLimit: 0.10
+    readonly property Region inputRegion: Region {
+        // item 模式跟随实际几何；手写坐标是窗口坐标系，会和模块的父坐标系错位。
+        Region { item: leftCapsule.inputProxy }
+        Region { item: rightCapsule.inputProxy }
+    }
+
     readonly property url barConfigUrl: Qt.resolvedUrl(configDir + "/bar.json")
     property var manifest: []   // [{name, band, options}]
     // 组件缓存按模块名共享；同一模块出现多次时只编译一份，实例各自独立。
@@ -26,13 +36,55 @@ Item {
             readonly property real hPadding: 16
             readonly property real contentWidth: contentSlot.childrenRect.width
             property real gapImpulseOffset: 0
+            property bool resizeReady: false
+            property real resizeStartWidth: 0
+            readonly property real resizeDirection: Math.sign(implicitWidth - resizeStartWidth)
+            readonly property real widthOvershoot: resizeDirection
+                * Math.max(0, resizeDirection * (width - implicitWidth))
+            readonly property real heightScale: 1 - Math.max(-root.resizeHeightLimit,
+                Math.min(root.resizeHeightLimit,
+                    widthOvershoot / Math.max(1, implicitWidth) * root.resizeHeightGain))
             property alias contentParent: contentSlot
 
             implicitWidth: contentWidth > 0 ? contentWidth + hPadding * 2 : 0
-            implicitHeight: BarState.moduleHeight
-            width: implicitWidth
+            // 高度连续跟随内容：模块自身的 width/height 才是做动画的那一层，
+            // 壳跟着走就不会在展开瞬间整体跳一截。
+            readonly property real contentHeight: contentSlot.childrenRect.height
+            implicitHeight: Math.max(BarState.moduleHeight, contentHeight)
+
+            // 显式驱动宽度。Behavior on width 在这里不生效（shell 是运行时
+            // createObject 出来的，且 visible 依赖 width），媒体胶囊变宽时
+            // 就表现为瞬移。用属性 + NumberAnimation 是可靠的写法。
+            // 尺寸动画的归属：默认由外壳做宽度动画（note/updates 那套）。
+            // 模块若自己驱动 width+height（灵动岛形变），置 selfDriven 后外壳纯跟随，
+            // 避免两条不同曲线同时跑导致形状在中间态被拉扯。
+            property bool selfDriven: false
+            property real animatedWidth: 0
+            width: selfDriven ? implicitWidth : animatedWidth
             height: implicitHeight
+            y: parent.height - height
             visible: width > 0
+            Component.onCompleted: animatedWidth = implicitWidth
+            onImplicitWidthChanged: {
+                resizeStartWidth = width;
+                if (selfDriven || !resizeReady || implicitWidth <= 0) {
+                    animatedWidth = implicitWidth;
+                    return;
+                }
+                widthAnim.stop();
+                widthAnim.to = implicitWidth;
+                widthAnim.restart();
+            }
+
+            NumberAnimation {
+                id: widthAnim
+
+                target: shell
+                property: "animatedWidth"
+                duration: root.resizeDuration
+                easing.type: Easing.OutBack
+                easing.overshoot: root.resizeOvershoot
+            }
 
             transform: Translate {
                 x: shell.gapImpulseOffset
@@ -42,15 +94,37 @@ Item {
                 anchors.fill: parent
                 radius: height / 2
                 color: Theme.surfaceContainerHigh
+                // 模块展开时由模块自绘形状接管；按自身内容高度判断，
+                // 一个模块展开不能让其他胶囊跟着失去底色。
+                opacity: shell.contentHeight > BarState.moduleHeight + 0.5 ? 0 : 1
+                transform: Scale {
+                    origin.x: shell.width / 2
+                    origin.y: shell.height / 2
+                    yScale: shell.heightScale
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+                }
             }
 
             Item {
-                id: contentSlot
+                anchors.fill: parent
+                clip: shell.width < shell.implicitWidth
 
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: (parent.height - height) / 2
-                width: childrenRect.width
-                height: childrenRect.height
+                Item {
+                    id: contentSlot
+
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.alignWhenCentered: false
+                    // 内容高于胶囊时才底部对齐（灵动岛向上长）；
+                    // 普通模块内容比胶囊矮，必须保持垂直居中。
+                    y: height > parent.height - 0.5
+                        ? parent.height - height
+                        : (parent.height - height) / 2
+                    width: childrenRect.width
+                    height: childrenRect.height
+                }
             }
         }
     }
@@ -64,9 +138,10 @@ Item {
         ? moduleGap : 0
     readonly property real sideExtent: Math.max(leftCapsuleWidth, rightCapsuleWidth)
     readonly property real avoidanceSideWidth: sideExtent
-    readonly property real contentWidth: sideExtent * 2 + middleGap
-    readonly property real leftCapsuleX: sideExtent - leftCapsuleWidth
-    readonly property real rightCapsuleX: sideExtent + middleGap
+    // Center the occupied span so a shell's own width cancels out of its center.
+    readonly property real contentWidth: leftCapsuleWidth + middleGap + rightCapsuleWidth
+    readonly property real leftCapsuleX: 0
+    readonly property real rightCapsuleX: leftCapsuleWidth + middleGap
 
     // 两个避让 band：launcher 左侧和右侧。
     AvoidingCapsule {
@@ -131,6 +206,9 @@ Item {
             const options = entry.options ?? {};
             for (const key in options)
                 instance[key] = options[key];
+            // 模块自带尺寸动画时，外壳不再插手宽度，避免双曲线打架。
+            shell.selfDriven = instance.drivesOwnSize === true;
+            shell.resizeReady = true;
         }
         for (const capsule of [leftCapsule, rightCapsule])
             capsule.syncBandItems();

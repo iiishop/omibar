@@ -1,8 +1,7 @@
 // BarWindow — 底部灵动岛式 bar 的 layer-shell 宿主窗口。
 //
-// 窗口结构：只锚 bottom 的紧凑 layer（非全屏）。
-// 历史教训：全屏透明层 + ExclusionMode.Normal 会把整个窗口算进排他区（巨大白板）；
-// 部分锚定早期渲染失败是因为 implicitWidth 链没建立，现在 contentWidth 链已通。
+// A fixed-width bottom strip keeps compositor geometry out of capsule animations.
+// The input mask follows the bands; transparent space passes pointer events through.
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -24,16 +23,22 @@ PanelWindow {
 
     anchors.top: false
     anchors.bottom: true
-    anchors.left: false
-    anchors.right: false
+    anchors.left: true
+    anchors.right: true
     // 贴近屏幕底部，避开 Hyprland gaps。
-    margins.bottom: 3
+    margins.bottom: bottomGap - surfacePadding
 
     readonly property real capsuleHeight: BarState.moduleHeight
+    readonly property int bottomGap: 3
+    readonly property int surfacePadding: Math.ceil(capsuleHeight * host.resizeHeightLimit / 2)
+    // 灵动岛从胶囊向上生长。窗口高度必须固定预留：layer surface 每次 resize
+    // 都会重新提交 surface，跟着动画改高度会瞬移并掉帧。
+    // 收起时多出来的区域是透明的，由 mask 决定不接收输入。
+    readonly property int islandReserve: 208
     property bool completed: false
 
-    implicitHeight: capsuleHeight
-    implicitWidth: panel.width + 2 * BarState.avoidanceInset
+    implicitHeight: capsuleHeight + surfacePadding * 2 + islandReserve
+    mask: host.inputRegion
 
     exclusiveZone: BarState.fullscreen ? 0 : 26
 
@@ -50,8 +55,14 @@ PanelWindow {
         readonly property real targetWidth: host.contentWidth > 0
             ? host.contentWidth : 10
 
-        x: BarState.avoidanceInset
-        y: BarState.fullscreen ? 5 : 0
+        // Preserve fractional centers throughout width interpolation.
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.alignWhenCentered: false
+        // 窗口高度会随灵动岛展开变化，胶囊必须钉在窗口底边，
+        // 否则窗口一长，整条 bar 会被顶上去。
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: bottomOffset
+        property real bottomOffset: root.surfacePadding + (BarState.fullscreen ? 5 : 0)
 
         width: targetWidth
         height: root.capsuleHeight
@@ -59,10 +70,7 @@ PanelWindow {
         opacity: 1.0
 
         // ---- 弹簧物理 ----
-        Behavior on width {
-            SpringAnimation { spring: 3; damping: 0.62; mass: 0.8 }
-        }
-        Behavior on y {
+        Behavior on bottomOffset {
             SpringAnimation { spring: 4; damping: 0.7; mass: 1.0 }
         }
 

@@ -11,7 +11,10 @@ QtObject {
     id: root
 
     readonly property list<MprisPlayer> players: Mpris.players.values
-    readonly property MprisPlayer active: players.length > 0 ? players[0] : null
+    // 多播放器共存时（浏览器 + 音乐播放器）优先正在播放的那个，
+    // 否则回落到第一个，避免 bar 停在无曲目的播放器上显示空白。
+    readonly property MprisPlayer active: players.find(player => player.isPlaying)
+        ?? (players.length > 0 ? players[0] : null)
     readonly property bool hasLyrics: lyricEntries.length > 0
     readonly property bool shouldRunCava: BarState.mediaAvailable
         && BarState.mediaPlaying
@@ -60,6 +63,7 @@ QtObject {
             BarState.mediaTitle = "";
             BarState.mediaArtist = "";
             BarState.mediaAlbum = "";
+            BarState.mediaArtUrl = "";
             BarState.mediaPosition = 0;
             BarState.mediaLength = 0;
             BarState.mediaLyricsLoading = false;
@@ -76,6 +80,7 @@ QtObject {
         BarState.mediaTitle = textValue(player.trackTitle);
         BarState.mediaArtist = textValue(player.trackArtist);
         BarState.mediaAlbum = textValue(player.trackAlbum);
+        BarState.mediaArtUrl = textValue(player.trackArtUrl);
         BarState.mediaLength = secondsValue(player.length);
         syncPosition(player);
         refreshPlayMode();
@@ -242,6 +247,7 @@ QtObject {
         function onTrackTitleChanged(): void { root.refreshPlayer(); }
         function onTrackArtistChanged(): void { root.refreshPlayer(); }
         function onTrackAlbumChanged(): void { root.refreshPlayer(); }
+        function onTrackArtUrlChanged(): void { root.refreshPlayer(); }
         function onLengthChanged(): void { root.refreshPlayer(); }
         function onCanControlChanged(): void { root.refreshPlayMode(); }
         function onLoopStateChanged(): void { root.refreshPlayMode(); }

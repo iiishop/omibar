@@ -60,7 +60,7 @@ Launch the bar with Quickshell:
 qs -c omibar -p .
 ```
 
-You should see the bottom bar appear with the media and clock capsules on the left, updates and notifications on the right. Hover a capsule to see its configured effect; open the launcher to watch the bar yield.
+You should see the bottom bar appear with the media, clock and note capsules on the left, updates and notifications on the right. Hover a capsule to see its configured effect; open the launcher to watch the bar yield.
 
 ## Configuration
 
@@ -73,6 +73,7 @@ You should see the bottom bar appear with the media and clock capsules on the le
   "modules": [
     { "name": "media", "band": "left" },
     { "name": "clock", "band": "left" },
+    { "name": "note", "band": "left" },
     { "name": "updates", "band": "right" },
     { "name": "notifications", "band": "right" }
   ]
@@ -82,6 +83,43 @@ You should see the bottom bar appear with the media and clock capsules on the le
 ### Module contract
 
 Each module ships `modules/<name>/Module.qml` (content) plus `module.json` (name / align / description). Animation, spacing, and hover are applied uniformly by `ModuleHost`; modules do not write their own entry/exit animations. A module entry may set `hover` (`lift`, `jelly`, `glow`, `none`).
+
+### Notes and reminders
+
+Hover **note** to capture a new note; scroll one notch to browse existing notes.
+The shelf displays up to seven cards, ordered by creation time, with newer notes
+nearest the capsule. Click to open the floating editor. Its sidebar supports
+search, Todo/today/completed filters, pinning, archives and a recoverable trash.
+Only the active Markdown line is source; fences, tables and quotes edit as blocks.
+
+Enable Todo and set a local `YYYY-MM-DD` / `HH:mm` deadline in the property bar.
+Markdown checkboxes never schedule reminders. New deadlines produce three short
+flashes and one optional sound; right-click to complete or snooze for ten minutes.
+Multiple due notes show a count and can be browsed with the wheel. Opening a note
+acknowledges its alert without completing it. Calendar dots represent active Todos
+(at most five per date); clicking a date filters the editor to that day.
+
+Editor shortcuts: `Ctrl+N` new note, `Ctrl+Shift+N` new Todo, `Ctrl+F` search,
+`Ctrl+Enter` toggle completion, `Esc` close. Markdown supports `Ctrl+Z` undo and
+`Ctrl+Shift+Z` redo across block changes. Clearing the title derives it from the
+first nonempty body line. Deletion moves a note to Trash, where it can be restored.
+
+Notes are atomically saved to `Quickshell.stateDir/notes.json`, with a 350 ms debounce
+and a write barrier on close. Corrupt files are kept intact; write errors keep the
+document in memory and show a retry action. Back up this file to preserve notes.
+Use one note entry per bar manifest and one running instance per storage file.
+
+Optional manifest settings:
+
+```json
+{ "name": "note", "band": "left", "options": { "soundEnabled": true, "respectDnd": true } }
+```
+
+`storagePath` can override the notes file location. Audio probes `pw-play`, then
+`canberra-gtk-play`, then `aplay`; absent audio tools mean visual-only reminders.
+DND suppresses sound, while visual reminders remain active. Neither clock nor
+caelestia is required. Run `sh tests/run-note-tests.sh` for isolated data, QML and
+storage recovery tests (Node.js and Quickshell required).
 
 ## Documentation
 
@@ -98,4 +136,3 @@ Each module ships `modules/<name>/Module.qml` (content) plus `module.json` (name
    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=iiishop/omibar&type=date&legend=top-left&sealed_token=MMCxquqAlbV9fQrbpHCinyXd73kFEZGJWo_Sw-FywlMyQxcGt40t9lAzY10jk0yXi6bc6c7xnGpnlpsWza0HAMd0NwMQiPIvYv-_P53Ebrpk2GPhvmPiCw" />
  </picture>
 </a>
-

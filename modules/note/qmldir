@@ -1,0 +1,10 @@
+Module 1.0 Module.qml
+NoteStore 1.0 NoteStore.qml
+NoteSound 1.0 NoteSound.qml
+NoteShelf 1.0 NoteShelf.qml
+NoteShelfCard 1.0 NoteShelfCard.qml
+NoteEditorWindow 1.0 NoteEditorWindow.qml
+NoteSidebar 1.0 NoteSidebar.qml
+MarkdownEditor 1.0 MarkdownEditor.qml
+MarkdownBlock 1.0 MarkdownBlock.qml
+TodoProperties 1.0 TodoProperties.qml

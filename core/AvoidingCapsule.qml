@@ -24,9 +24,13 @@ Item {
         - BarState.launcherPadding - leftStackOffset - rightX
     readonly property real rightYieldOffset: BarState.launcherRight
         + BarState.launcherPadding + rightStackOffset - leftX
-    readonly property real yieldOffset: BarState.launcherOpen
-        ? (yieldDirection < 0 ? leftYieldOffset : rightYieldOffset) : 0
+    property real yieldProgress: BarState.launcherOpen ? 1 : 0
+    readonly property real yieldOffset: yieldProgress
+        * (yieldDirection < 0 ? leftYieldOffset : rightYieldOffset)
     readonly property Item moduleRow: row
+    // 输入区代理：胶囊行 + 灵动岛向上溢出的部分。
+    // Region { item: ... } 跟随这块几何，展开后卡片才能收 pointer。
+    readonly property Item inputProxy: inputProxyItem
     readonly property real motionDirection: BarState.launcherOpen
         ? yieldDirection : -yieldDirection
     readonly property real jellyLag: 14
@@ -123,10 +127,8 @@ Item {
 
     onGapWaveProgressChanged: applyGapWave()
 
-    Behavior on width {
-        SpringAnimation { spring: 3; damping: 0.62; mass: 0.8 }
-    }
-    Behavior on x {
+    // Layout positions follow width in the same frame; only avoidance has travel time.
+    Behavior on yieldProgress {
         NumberAnimation {
             duration: root.travelDuration
             easing.type: Easing.OutCubic
@@ -138,11 +140,24 @@ Item {
 
         objectName: root.rowObjectName
         anchors.centerIn: parent
+        // 高度锁在胶囊高度：模块可以向上溢出（灵动岛展开），
+        // 但绝不能把整条 bar 撑高或把邻居推走。
+        height: BarState.moduleHeight
         spacing: root.moduleGap
 
         transform: Translate {
             x: root.bodyLag * root.contentLagRatio
         }
+    }
+
+    // 不可见，只为给 mask 提供几何：胶囊行往上加上展开高度。
+    Item {
+        id: inputProxyItem
+
+        x: row.x
+        y: row.y - BarState.islandExpandExtent
+        width: row.width
+        height: row.height + BarState.islandExpandExtent
     }
 
     JellyMotion {

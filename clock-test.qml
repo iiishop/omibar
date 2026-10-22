@@ -2,6 +2,7 @@
 import QtQuick
 import Quickshell
 import "modules/clock" as Clock
+import "core"
 
 ShellRoot {
     id: suite
@@ -35,6 +36,17 @@ ShellRoot {
                 suite.check(calendar.dayAt(3) === 1, "Month starts on Thursday");
                 suite.check(calendar.dayAt(31) === 29, "Leap day is present");
                 suite.check(calendar.dayAt(32) === 0, "Trailing cells stay empty");
+                BarState.todoCountByDate = ({ "2024-02-29": 8 });
+                const serial = BarState.noteDateRequestSerial;
+                calendar.requestDate("2024-02-29");
+                suite.check(BarState.noteDateRequestSerial === serial, "Absent note module is inert");
+                BarState.noteAvailable = true;
+                calendar.requestDate("2024-02-29");
+                calendar.requestDate("2024-02-29");
+                suite.check(BarState.noteDateRequestSerial === serial + 2, "Repeated date requests are delivered");
+                suite.check(BarState.noteDateRequest === "2024-02-29", "Date request keeps local date");
+                calendar.requestDate("2024-02-28");
+                suite.check(BarState.noteDateRequestSerial === serial + 2, "Empty dates are inert");
                 calendar.now = new Date(2026, 2, 1);
                 suite.check(calendar.dayAt(6) === 1, "Sunday uses the last column");
                 suite.check(calendar.dayAt(36) === 31, "Sixth week remains visible");

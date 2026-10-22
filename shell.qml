@@ -23,6 +23,10 @@ ShellRoot {
             Core.BarState.deformPulse++;
         }
 
+        function demoMediaCard(): void {
+            Core.BarState.mediaCardPulse++;
+        }
+
         function demoYield(): void {
             Core.BarState.launcherOpen = !Core.BarState.launcherOpen;
         }

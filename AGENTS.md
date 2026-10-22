@@ -8,6 +8,8 @@
 - caelestia 是可选集成；全仓库唯一允许出现 `qs -c caelestia ipc` 字样的文件是 `core/CaelestiaBridge.qml`。
 - `core/*.qml` 是单例（见 core/qmldir），禁止在其中创建第二个 PanelWindow。
 - bar 的显隐/避让动画必须做在内部元素的 y/opacity 上；PanelWindow 自身的 visible 不得参与动画（合成器 layersIn/Out 会叠加）。
+- 胶囊因自身内容变化而伸缩时，屏幕横向中心保持不变，左右边缘等量展开或收缩；伸缩动画不得附加水平位移。
+- 胶囊伸缩只允许一次越界回弹：展开越界时略压低，收缩越界时略增高；高度由宽度越界量驱动，不叠加独立振荡动画。
 - 新模块必须在 `bar.json` 登记后才被装载；清单是唯一事实来源。
 - 修改避让、launcher 状态同步、caelestia IPC、胶囊布局时，必须同步维护 `docs/avoidance-and-caelestia.md`。
 
