@@ -72,6 +72,8 @@ QtObject {
             BarState.mediaSpectrum = [];
             BarState.mediaPlayMode = "sequential";
             BarState.mediaPlayModeAvailable = false;
+            BarState.mediaPlayerName = "";
+            BarState.mediaCanSeek = false;
             return;
         }
 
@@ -82,6 +84,8 @@ QtObject {
         BarState.mediaAlbum = textValue(player.trackAlbum);
         BarState.mediaArtUrl = textValue(player.trackArtUrl);
         BarState.mediaLength = secondsValue(player.length);
+        BarState.mediaPlayerName = textValue(player.identity);
+        BarState.mediaCanSeek = player.canSeek && player.positionSupported;
         syncPosition(player);
         refreshPlayMode();
 
@@ -236,6 +240,18 @@ QtObject {
     function next(): void {
         if (active !== null && active.canGoNext)
             active.next();
+    }
+
+    // ratio 为 0..1 的整曲比例；播放器不支持 seek 时静默忽略。
+    function seek(ratio: real): void {
+        const player = active;
+        if (player === null || !player.canSeek || !player.positionSupported)
+            return;
+        const length = secondsValue(player.length);
+        if (length <= 0)
+            return;
+        player.position = Math.max(0, Math.min(1, ratio)) * length;
+        syncPosition(player);
     }
 
     onActiveChanged: refreshPlayer()

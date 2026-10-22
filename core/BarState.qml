@@ -49,6 +49,9 @@ QtObject {
     property int mediaCardPulse: 0
     property string mediaPlayMode: "sequential"
     property bool mediaPlayModeAvailable: false
+    // 播放器身份（MPRIS identity，如 "Spotify" / "sidra"）与可拖动性。
+    property string mediaPlayerName: ""
+    property bool mediaCanSeek: false
     readonly property real mediaProgress: mediaLength > 0
         ? Math.max(0, Math.min(1, mediaPosition / mediaLength))
         : 0

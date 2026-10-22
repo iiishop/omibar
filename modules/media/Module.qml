@@ -4,6 +4,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Effects
+import QtQuick.Shapes
 import "../../core"
 
 Item {
@@ -54,13 +56,8 @@ Item {
     readonly property bool expanded: islandOpen
     readonly property bool hasArt: barState.mediaArtUrl !== ""
     readonly property string cardTitle: hasTitle ? barState.mediaTitle : barState.mediaArtist
-    readonly property string cardSubtitle: {
-        if (!hasTitle || !hasArtist)
-            return "";
-        return barState.mediaAlbum !== ""
-            ? barState.mediaArtist + " · " + barState.mediaAlbum
-            : barState.mediaArtist;
-    }
+    // 卡片副标题只放艺术家；专辑留给第三行（有歌词时第三行换成歌词），避免重复。
+    readonly property string cardSubtitle: hasArtist ? barState.mediaArtist : ""
 
     property real animWidth: 0
     property real animHeight: 0
@@ -542,28 +539,100 @@ Item {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
+        // ---- 封面 + 环形进度 ----
         Item {
-            id: header
+            id: ringHost
 
-            width: parent.width
-            height: 88
+            width: 92
+            height: 92
+            x: 0
+            y: 0
+
+            readonly property real strokeWidth: 3
+            readonly property real ringRadius: width / 2 - strokeWidth / 2 - 0.5
+
+            // 轨道：固定 270°，缺口朝下
+            Shape {
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeColor: Qt.rgba(Theme.outline.r, Theme.outline.g,
+                        Theme.outline.b, 0.30)
+                    fillColor: "transparent"
+                    strokeWidth: ringHost.strokeWidth
+                    capStyle: ShapePath.RoundCap
+
+                    PathAngleArc {
+                        centerX: ringHost.width / 2
+                        centerY: ringHost.height / 2
+                        radiusX: ringHost.ringRadius
+                        radiusY: ringHost.ringRadius
+                        startAngle: -45
+                        sweepAngle: 270
+                    }
+                }
+            }
+
+            // 播放进度：同一缺口、同一方向，长度跟 mediaProgress
+            Shape {
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeColor: Theme.primary
+                    fillColor: "transparent"
+                    strokeWidth: ringHost.strokeWidth
+                    capStyle: ShapePath.RoundCap
+
+                    PathAngleArc {
+                        centerX: ringHost.width / 2
+                        centerY: ringHost.height / 2
+                        radiusX: ringHost.ringRadius
+                        radiusY: ringHost.ringRadius
+                        startAngle: -45
+                        sweepAngle: 270 * Math.max(0.001, root.barState.mediaProgress)
+                    }
+                }
+            }
 
             Rectangle {
                 id: coverFrame
 
-                width: 88
-                height: 88
-                radius: 18
+                anchors.centerIn: parent
+                width: 76
+                height: 76
+                radius: 15
                 color: Theme.surfaceContainerHighest
-                clip: true
 
+                // Rectangle.clip 是矩形裁剪，不会跟随 radius：
+                // 封面图必须走 mask，否则四个角会露出直角。
                 Image {
+                    id: coverArt
+
                     anchors.fill: parent
-                    visible: root.hasArt
+                    visible: false
                     source: root.hasArt ? root.barState.mediaArtUrl : ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: true
+                }
+
+                MultiEffect {
+                    anchors.fill: parent
+                    visible: root.hasArt
+                    source: coverArt
+                    maskEnabled: true
+                    maskSource: coverMask
+                }
+
+                Rectangle {
+                    id: coverMask
+
+                    anchors.fill: parent
+                    radius: coverFrame.radius
+                    visible: false
+                    layer.enabled: true
                 }
 
                 Text {
@@ -573,206 +642,222 @@ Item {
                     color: Theme.outline
                     renderType: Text.NativeRendering
                     font.family: Theme.iconFont
-                    font.pixelSize: 32
+                    font.pixelSize: 28
                     font.variableAxes: { "FILL": 1, "GRAD": -20 }
-                }
-            }
-
-            Column {
-                anchors.left: coverFrame.right
-                anchors.leftMargin: 16
-                anchors.right: parent.right
-                anchors.verticalCenter: coverFrame.verticalCenter
-                spacing: 5
-
-                Text {
-                    width: parent.width
-                    text: root.cardTitle
-                    color: Theme.fg
-                    elide: Text.ElideRight
-                    renderType: Text.NativeRendering
-                    font.family: Theme.bodyFont
-                    font.pixelSize: 16
-                    font.weight: Font.Medium
-                }
-
-                Text {
-                    width: parent.width
-                    visible: root.cardSubtitle !== ""
-                    text: root.cardSubtitle
-                    color: Theme.secondary
-                    elide: Text.ElideRight
-                    renderType: Text.NativeRendering
-                    font.family: Theme.bodyFont
-                    font.pixelSize: 12
-                }
-
-                Text {
-                    width: parent.width
-                    visible: root.showLyrics
-                    text: root.showLyrics ? root.barState.mediaLyric : ""
-                    color: Theme.fgVariant
-                    elide: Text.ElideRight
-                    renderType: Text.NativeRendering
-                    font.family: Theme.bodyFont
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
                 }
             }
         }
 
+        // ---- 标题 / 艺术家 / 歌词或专辑 ----
+        Column {
+            id: infoColumn
+
+            anchors.left: ringHost.right
+            anchors.leftMargin: 14
+            anchors.right: parent.right
+            anchors.verticalCenter: ringHost.verticalCenter
+            spacing: 3
+
+            Text {
+                width: parent.width
+                text: root.cardTitle
+                color: Theme.fg
+                elide: Text.ElideRight
+                renderType: Text.NativeRendering
+                font.family: Theme.bodyFont
+                font.pixelSize: 16
+                font.weight: Font.Medium
+            }
+
+            Text {
+                width: parent.width
+                visible: root.cardSubtitle !== ""
+                text: root.cardSubtitle
+                color: Theme.fgVariant
+                elide: Text.ElideRight
+                renderType: Text.NativeRendering
+                font.family: Theme.bodyFont
+                font.pixelSize: 12
+            }
+
+            Text {
+                width: parent.width
+                text: root.showLyrics ? root.barState.mediaLyric
+                                      : (root.barState.mediaAlbum !== "" ? root.barState.mediaAlbum : "")
+                visible: text !== ""
+                color: root.showLyrics ? Theme.secondary : Theme.outline
+                elide: Text.ElideRight
+                renderType: Text.NativeRendering
+                font.family: Theme.bodyFont
+                font.pixelSize: 11
+                font.weight: root.showLyrics ? Font.Medium : Font.Normal
+            }
+        }
+
+        // ---- 播放器身份 ----
+        Text {
+            anchors.top: parent.top
+            anchors.right: parent.right
+            text: root.barState.mediaPlayerName
+            visible: text !== ""
+            color: Qt.rgba(Theme.outline.r, Theme.outline.g, Theme.outline.b, 0.72)
+            renderType: Text.NativeRendering
+            font.family: Theme.monoFont
+            font.pixelSize: 9
+        }
+
+        // ---- 进度：时间标签定宽防跳动，轨道可拖动 ----
         Item {
             id: progress
 
-            anchors.top: header.bottom
-            anchors.topMargin: 14
+            anchors.top: ringHost.bottom
+            anchors.topMargin: 6
             anchors.left: parent.left
             anchors.right: parent.right
-            height: 18
+            height: 16
+
+            TextMetrics {
+                id: timeMetrics
+
+                font.family: Theme.monoFont
+                font.pixelSize: 10
+                text: "0:00"
+            }
 
             Text {
                 id: positionText
 
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.timeText(root.barState.mediaPosition)
-                color: Theme.outline
+                width: Math.ceil(timeMetrics.width)
+                text: root.timeText(progress.dragProgress >= 0
+                    ? progress.dragProgress * root.barState.mediaLength
+                    : root.barState.mediaPosition)
+                color: progress.dragProgress >= 0 ? Theme.primary : Theme.outline
                 renderType: Text.NativeRendering
                 font.family: Theme.monoFont
                 font.pixelSize: 10
+                horizontalAlignment: Text.AlignLeft
             }
 
             Text {
-                id: lengthText
-
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                width: Math.ceil(timeMetrics.width)
                 text: root.timeText(root.barState.mediaLength)
                 color: Theme.outline
                 renderType: Text.NativeRendering
                 font.family: Theme.monoFont
                 font.pixelSize: 10
+                horizontalAlignment: Text.AlignRight
             }
 
             Item {
+                id: progressTrack
+
                 anchors.left: positionText.right
                 anchors.leftMargin: 10
-                anchors.right: lengthText.left
-                anchors.rightMargin: 10
+                anchors.right: parent.right
+                anchors.rightMargin: 10 + Math.ceil(timeMetrics.width) + 10
                 anchors.verticalCenter: parent.verticalCenter
                 height: 4
+
+                // 拖动预览：-1 表示未在交互
+                property real dragProgress: -1
+                readonly property real shownProgress: dragProgress >= 0
+                    ? dragProgress : Math.max(0, Math.min(1, root.barState.mediaProgress))
 
                 Rectangle {
                     anchors.fill: parent
                     radius: 2
                     color: Qt.rgba(Theme.outlineVariant.r, Theme.outlineVariant.g,
-                        Theme.outlineVariant.b, 0.42)
+                        Theme.outlineVariant.b, 0.46)
                 }
 
                 Rectangle {
-                    width: parent.width * root.barState.mediaProgress
+                    width: parent.width * progressTrack.shownProgress
                     height: parent.height
                     radius: 2
                     color: Theme.primary
 
                     Behavior on width {
+                        enabled: progressTrack.dragProgress < 0
                         NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
                     }
                 }
 
                 Rectangle {
-                    x: Math.max(0, parent.width * root.barState.mediaProgress - width)
+                    x: Math.max(0, Math.min(parent.width - width,
+                        parent.width * progressTrack.shownProgress - width / 2))
                     anchors.verticalCenter: parent.verticalCenter
-                    width: root.barState.mediaProgress > 0 ? 10 : 0
-                    height: 4
-                    radius: 2
-                    color: Theme.tertiary
+                    width: progressTrack.dragProgress >= 0 ? 10 : 0
+                    height: 10
+                    radius: width / 2
+                    color: Theme.primary
 
-                    Behavior on x {
-                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                    Behavior on width {
+                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                     }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.topMargin: -6
+                    anchors.bottomMargin: -6
+                    enabled: root.barState.mediaCanSeek
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+
+                    function ratioAt(xPos: real): real {
+                        return Math.max(0, Math.min(1, xPos / width));
+                    }
+
+                    onPressed: mouse => {
+                        progressTrack.dragProgress = ratioAt(mouse.x);
+                        MediaController.seek(progressTrack.dragProgress);
+                    }
+                    onPositionChanged: mouse => {
+                        if (pressed)
+                            progressTrack.dragProgress = ratioAt(mouse.x);
+                    }
+                    onReleased: progressTrack.dragProgress = -1
+                    onCanceled: progressTrack.dragProgress = -1
                 }
             }
         }
 
-        Item {
+        // ---- 控制键：主播放键放大并反白 ----
+        Row {
             id: cardControls
 
             anchors.top: progress.bottom
-            anchors.topMargin: 14
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 30
+            anchors.topMargin: 6
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 12
 
-            Row {
-                anchors.centerIn: parent
-                spacing: 6
+            CardButton {
+                icon: root.playModeIcon
+                active: root.playModeActive
+                available: root.barState.mediaPlayModeAvailable
+                onTapped: MediaController.cyclePlayMode()
+            }
 
-                Repeater {
-                    model: [
-                        { icon: root.playModeIcon, action: "mode", active: root.playModeActive, enabled: root.barState.mediaPlayModeAvailable },
-                        { icon: "skip_previous", action: "previous", active: false, enabled: MediaController.active !== null && MediaController.active.canGoPrevious },
-                        { icon: root.barState.mediaPlaying ? "pause" : "play_arrow", action: "toggle", active: false, enabled: MediaController.active !== null && MediaController.active.canTogglePlaying },
-                        { icon: "skip_next", action: "next", active: false, enabled: MediaController.active !== null && MediaController.active.canGoNext }
-                    ]
+            CardButton {
+                icon: "skip_previous"
+                available: MediaController.active !== null && MediaController.active.canGoPrevious
+                onTapped: MediaController.previous()
+            }
 
-                    delegate: Item {
-                        id: button
+            CardButton {
+                icon: root.barState.mediaPlaying ? "pause" : "play_arrow"
+                primary: true
+                available: MediaController.active !== null && MediaController.active.canTogglePlaying
+                onTapped: MediaController.toggle()
+            }
 
-                        required property var modelData
-
-                        width: 30
-                        height: 30
-                        opacity: modelData.enabled ? 1 : 0.35
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: height / 2
-                            color: button.modelData.active
-                                ? Qt.rgba(Theme.secondaryContainer.r, Theme.secondaryContainer.g,
-                                    Theme.secondaryContainer.b, 0.66)
-                                : buttonMouse.containsMouse
-                                ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.16)
-                                : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
-
-                            Behavior on color {
-                                ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
-                            }
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: button.modelData.icon
-                            color: button.modelData.active ? Theme.primary : Theme.fg
-                            renderType: Text.NativeRendering
-                            font.family: Theme.iconFont
-                            font.pixelSize: 18
-                            font.variableAxes: { "FILL": 1, "GRAD": -20 }
-                        }
-
-                        MouseArea {
-                            id: buttonMouse
-
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: button.modelData.enabled
-                                ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: {
-                                if (!button.modelData.enabled)
-                                    return;
-                                const action = button.modelData.action;
-                                if (action === "mode")
-                                    MediaController.cyclePlayMode();
-                                else if (action === "previous")
-                                    MediaController.previous();
-                                else if (action === "toggle")
-                                    MediaController.toggle();
-                                else if (action === "next")
-                                    MediaController.next();
-                            }
-                        }
-                    }
-                }
+            CardButton {
+                icon: "skip_next"
+                available: MediaController.active !== null && MediaController.active.canGoNext
+                onTapped: MediaController.next()
             }
         }
     }
@@ -800,6 +885,66 @@ Item {
             to: root.showLyricText ? 1 : 0
             duration: 130
             easing.type: Easing.OutCubic
+        }
+    }
+
+    // 卡片里的控制键：圆底、主键反白放大，材质与 caelestia 的 tonal IconButton 对齐。
+    component CardButton: Item {
+        id: btn
+
+        required property string icon
+        property bool primary: false
+        property bool active: false
+        property bool available: true
+        signal tapped()
+
+        implicitWidth: primary ? 40 : 30
+        implicitHeight: primary ? 40 : 30
+        width: implicitWidth
+        height: implicitHeight
+        opacity: available ? 1 : 0.32
+
+        Behavior on opacity {
+            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: btn.primary
+                ? (btnMouse.containsMouse ? Qt.lighter(Theme.primary, 1.1) : Theme.primary)
+                : btn.active
+                ? Qt.rgba(Theme.secondaryContainer.r, Theme.secondaryContainer.g,
+                    Theme.secondaryContainer.b, 0.72)
+                : btnMouse.containsMouse
+                ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.14)
+                : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.06)
+
+            Behavior on color {
+                ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+            }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: btn.icon
+            color: btn.primary ? Theme.surface : (btn.active ? Theme.primary : Theme.fg)
+            renderType: Text.NativeRendering
+            font.family: Theme.iconFont
+            font.pixelSize: btn.primary ? 24 : 18
+            font.variableAxes: { "FILL": 1, "GRAD": -20 }
+        }
+
+        MouseArea {
+            id: btnMouse
+
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: btn.available ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: {
+                if (btn.available)
+                    btn.tapped();
+            }
         }
     }
 
