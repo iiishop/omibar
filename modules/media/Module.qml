@@ -222,17 +222,31 @@ Item {
         text: "一二三四五六七八九十一二三四五"
     }
 
-    HoverHandler {
-        id: hoverHandler
+    // hover 判定覆盖整个岛：root 只有 380 宽，而形状本体是 root + 两侧各 16
+    // （surface 的 hPadding）。用一块透明层单独吃 hover，几何比 root 大一圈。
+    // Qt 的 HoverHandler 不参与 hit test 遮挡筛选，被上层内容盖住也照样收到 hover，
+    // 所以这块可以放在 z:-1，不影响卡片里按钮/进度条的点击。
+    Item {
+        id: islandHoverArea
 
-        onHoveredChanged: {
-            if (hovered) {
-                closeTimer.stop();
-                if (root.barState.mediaAvailable)
-                    openTimer.restart();
-            } else {
-                openTimer.stop();
-                closeTimer.restart();
+        x: -16
+        y: 0
+        width: root.width + 32
+        height: root.height
+        z: -1
+
+        HoverHandler {
+            id: hoverHandler
+
+            onHoveredChanged: {
+                if (hovered) {
+                    closeTimer.stop();
+                    if (root.barState.mediaAvailable)
+                        openTimer.restart();
+                } else {
+                    openTimer.stop();
+                    closeTimer.restart();
+                }
             }
         }
     }
@@ -251,7 +265,8 @@ Item {
     Timer {
         id: closeTimer
 
-        interval: 360
+        // 从胶囊区移到卡片上沿要跨 160px，360ms 太紧；这里留出余量。
+        interval: 520
         onTriggered: {
             if (!hoverHandler.hovered)
                 root.islandOpen = false;
