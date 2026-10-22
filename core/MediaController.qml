@@ -69,6 +69,7 @@ QtObject {
             BarState.mediaLyricsLoading = false;
             BarState.mediaLyricsAvailable = false;
             BarState.mediaLyric = "";
+            BarState.mediaLyricNext = "";
             BarState.mediaSpectrum = [];
             BarState.mediaPlayMode = "sequential";
             BarState.mediaPlayModeAvailable = false;
@@ -149,6 +150,7 @@ QtObject {
     function updateLyric(): void {
         if (!hasLyrics) {
             BarState.mediaLyric = "";
+            BarState.mediaLyricNext = "";
             return;
         }
 
@@ -164,6 +166,8 @@ QtObject {
             currentIndex + lyricLineOffset);
         const current = lyricEntries[displayIndex];
         BarState.mediaLyric = current.text === "" ? "♪" : current.text;
+        const next = lyricEntries[displayIndex + 1];
+        BarState.mediaLyricNext = next === undefined ? "" : next.text;
     }
 
     function refreshPlayMode(): void {

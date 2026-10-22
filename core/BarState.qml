@@ -45,6 +45,8 @@ QtObject {
     property bool mediaLyricsLoading: false
     property bool mediaLyricsAvailable: false
     property string mediaLyric: ""
+    // 卡片歌词带的下一行（当前行的 follow-up），用于滚动预览。
+    property string mediaLyricNext: ""
     property var mediaSpectrum: []
     property int mediaCardPulse: 0
     property string mediaPlayMode: "sequential"

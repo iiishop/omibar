@@ -695,17 +695,29 @@ Item {
                 font.pixelSize: 12
             }
 
+            // 有歌词时占两行：当前行 + 下一行；没歌词就退化成专辑名。
             Text {
                 width: parent.width
+                visible: root.showLyrics || root.barState.mediaAlbum !== ""
                 text: root.showLyrics ? root.barState.mediaLyric
-                                      : (root.barState.mediaAlbum !== "" ? root.barState.mediaAlbum : "")
-                visible: text !== ""
-                color: root.showLyrics ? Theme.secondary : Theme.outline
+                                      : root.barState.mediaAlbum
+                color: root.showLyrics ? Theme.primary : Theme.outline
                 elide: Text.ElideRight
                 renderType: Text.NativeRendering
                 font.family: Theme.bodyFont
                 font.pixelSize: 11
                 font.weight: root.showLyrics ? Font.Medium : Font.Normal
+            }
+
+            Text {
+                width: parent.width
+                visible: root.showLyrics && root.barState.mediaLyricNext !== ""
+                text: root.showLyrics ? root.barState.mediaLyricNext : ""
+                color: Qt.rgba(Theme.outline.r, Theme.outline.g, Theme.outline.b, 0.72)
+                elide: Text.ElideRight
+                renderType: Text.NativeRendering
+                font.family: Theme.bodyFont
+                font.pixelSize: 11
             }
         }
 
