@@ -23,7 +23,11 @@ Item {
     readonly property int lyricSideInset: showLyrics ? 20 : 0
     readonly property int metadataInset: showMetadata ? 18 : 7
     readonly property bool hovered: hoverHandler.hovered
-    readonly property bool pointerInside: hoverHandler.hovered || cardHover.hovered
+    // 指针是否还在岛上。用命令式标志位，不用 handler 属性的绑定：
+    // hoveredChanged 里立刻读绑定值会拿到旧值，进入瞬间会误判成"离开"。
+    property bool areaHovered: false
+    property bool cardHovered: false
+    readonly property bool pointerInside: areaHovered || cardHovered
     readonly property bool hasTitle: barState.mediaTitle !== ""
     readonly property bool hasArtist: barState.mediaArtist !== ""
     readonly property bool showMetadata: barState.mediaAvailable && (hasTitle || hasArtist)
@@ -244,15 +248,23 @@ Item {
         HoverHandler {
             id: hoverHandler
 
-            onHoveredChanged: root.updatePointer()
+            onHoveredChanged: {
+                root.areaHovered = hovered;
+                root.updatePointer();
+            }
         }
     }
 
     // 卡片内容区再挂一个：鼠标抓取（按下按钮、拖进度条）期间指针事件的归属会变，
     // 光靠外面那块判定容易在点击瞬间丢掉 hover，导致卡片收回。
     function updatePointer(): void {
+        pointerRecheck.restart();
+    }
+
+    function applyPointer(): void {
         console.log("[island] pointer", pointerInside,
-                    "area", hoverHandler.hovered, "card", cardHover.hovered);
+                    "area", areaHovered, "card", cardHovered,
+                    "open", islandOpen);
         if (pointerInside) {
             closeTimer.stop();
             if (root.barState.mediaAvailable)
@@ -261,6 +273,13 @@ Item {
             openTimer.stop();
             closeTimer.restart();
         }
+    }
+
+    Timer {
+        id: pointerRecheck
+
+        interval: 60
+        onTriggered: root.applyPointer()
     }
 
 
@@ -571,7 +590,10 @@ Item {
         HoverHandler {
             id: cardHover
 
-            onHoveredChanged: root.updatePointer()
+            onHoveredChanged: {
+                root.cardHovered = hovered;
+                root.updatePointer();
+            }
         }
 
         // ---- 封面 + 环形进度 ----
