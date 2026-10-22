@@ -568,8 +568,8 @@ Item {
                         centerY: ringHost.height / 2
                         radiusX: ringHost.ringRadius
                         radiusY: ringHost.ringRadius
-                        startAngle: -45
-                        sweepAngle: 270
+                        startAngle: 90
+                        sweepAngle: 359.9
                     }
                 }
             }
@@ -591,7 +591,7 @@ Item {
                         radiusX: ringHost.ringRadius
                         radiusY: ringHost.ringRadius
                         startAngle: -45
-                        sweepAngle: 270 * Math.max(0.001, root.barState.mediaProgress)
+                        sweepAngle: 359.9 * Math.max(0.001, root.barState.mediaProgress)
                     }
                 }
             }
