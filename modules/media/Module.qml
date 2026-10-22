@@ -251,6 +251,8 @@ Item {
     // 卡片内容区再挂一个：鼠标抓取（按下按钮、拖进度条）期间指针事件的归属会变，
     // 光靠外面那块判定容易在点击瞬间丢掉 hover，导致卡片收回。
     function updatePointer(): void {
+        console.log("[island] pointer", pointerInside,
+                    "area", hoverHandler.hovered, "card", cardHover.hovered);
         if (pointerInside) {
             closeTimer.stop();
             if (root.barState.mediaAvailable)
@@ -261,15 +263,7 @@ Item {
         }
     }
 
-    // 交互期间强制保持：按下就停表，松手再看指针是不是还在岛里。
-    function holdOpen(): void {
-        closeTimer.stop();
-    }
 
-    function releaseHold(): void {
-        if (!pointerInside)
-            closeTimer.restart();
-    }
 
     Timer {
         id: openTimer
@@ -865,7 +859,6 @@ Item {
                     }
 
                     onPressed: mouse => {
-                        root.holdOpen();
                         progressTrack.dragProgress = ratioAt(mouse.x);
                         MediaController.seek(progressTrack.dragProgress);
                     }
@@ -873,14 +866,8 @@ Item {
                         if (pressed)
                             progressTrack.dragProgress = ratioAt(mouse.x);
                     }
-                    onReleased: {
-                        progressTrack.dragProgress = -1;
-                        root.releaseHold();
-                    }
-                    onCanceled: {
-                        progressTrack.dragProgress = -1;
-                        root.releaseHold();
-                    }
+                    onReleased: progressTrack.dragProgress = -1
+                    onCanceled: progressTrack.dragProgress = -1
                 }
             }
         }
@@ -1001,9 +988,6 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: btn.available ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onPressed: root.holdOpen()
-            onReleased: root.releaseHold()
-            onCanceled: root.releaseHold()
             onClicked: {
                 if (btn.available)
                     btn.tapped();
